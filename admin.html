@@ -17,6 +17,40 @@
     .key-status { font-size: 0.78rem; color: var(--text-mute); white-space: nowrap; }
     .key-status.ok { color: #65d18d; }
     .form-success { background: rgba(101, 209, 141, 0.08); border: 1px solid rgba(101, 209, 141, 0.35); border-radius: var(--radius); padding: 1rem; color: #b8e6c8; font-size: 0.9rem; }
+
+    .list-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 1rem; gap: 1rem; flex-wrap: wrap; }
+    .list-head h3 { margin: 0; font-size: 1.2rem; letter-spacing: -0.01em; }
+    .list-head .muted { font-size: 0.85rem; }
+    .list-actions { display: flex; gap: 0.5rem; align-items: center; }
+    .list-actions label { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--text-dim); font-size: 0.85rem; cursor: pointer; }
+    .list-actions input[type="checkbox"] { accent-color: var(--accent); }
+    .list-actions button { padding: 0.45rem 0.9rem; font-size: 0.82rem; }
+
+    .booking-card { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.6rem; }
+    .booking-card.past { opacity: 0.55; }
+    .booking-row { display: flex; gap: 0.75rem; align-items: baseline; flex-wrap: wrap; }
+    .booking-row.head { justify-content: space-between; }
+    .pill { display: inline-block; padding: 0.18rem 0.55rem; border-radius: 999px; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
+    .pill.confirmed { background: rgba(101, 209, 141, 0.12); color: #88dca7; border: 1px solid rgba(101, 209, 141, 0.3); }
+    .pill.pending { background: rgba(224, 160, 74, 0.12); color: #e0b86b; border: 1px solid rgba(224, 160, 74, 0.3); }
+    .pill.manual { background: rgba(201, 164, 76, 0.1); color: var(--accent); border: 1px solid var(--accent-line); }
+    .booking-when { font-size: 0.95rem; color: var(--text); font-weight: 500; }
+    .booking-meta { font-size: 0.85rem; color: var(--text-dim); }
+    .booking-customer { font-size: 0.85rem; color: var(--text-dim); }
+    .booking-customer b { color: var(--text); font-weight: 500; }
+    .booking-id { font-size: 0.7rem; color: var(--text-mute); font-family: ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: -0.02em; }
+    .booking-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.4rem; }
+    .booking-actions button { padding: 0.4rem 0.85rem; font-size: 0.8rem; }
+    .btn-confirm { background: var(--accent); color: #1a1408; border: 1px solid var(--accent); border-radius: 999px; cursor: pointer; font-weight: 600; }
+    .btn-confirm:hover { background: #d8b563; }
+    .btn-decline, .btn-cancel { background: transparent; color: #f5a5a5; border: 1px solid rgba(220, 70, 70, 0.35); border-radius: 999px; cursor: pointer; font-weight: 500; }
+    .btn-decline:hover, .btn-cancel:hover { background: rgba(220, 70, 70, 0.1); }
+    .booking-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .empty { color: var(--text-mute); font-size: 0.9rem; padding: 1rem; text-align: center; border: 1px dashed var(--border); border-radius: var(--radius); }
+    .list-error { background: rgba(220, 70, 70, 0.08); border: 1px solid rgba(220, 70, 70, 0.35); color: #f5a5a5; border-radius: var(--radius); padding: 0.85rem 1rem; font-size: 0.88rem; margin-bottom: 1rem; }
+
+    .divider { border: 0; border-top: 1px solid var(--border); margin: 3rem 0 2rem; }
   </style>
 </head>
 <body>
@@ -31,8 +65,8 @@
   <main class="admin-wrap">
     <div class="admin-head section-head">
       <p class="eyebrow">Admin</p>
-      <h2>Manual booking</h2>
-      <p class="section-sub">Block off a time slot directly. Useful for direct-text customers, personal time, or anything else that didn't come through the form.</p>
+      <h2>Dashboard</h2>
+      <p class="section-sub">All bookings, plus a way to add manual ones.</p>
     </div>
 
     <div class="key-panel">
@@ -42,6 +76,28 @@
       </label>
       <button type="button" class="btn btn-ghost" id="key-save">Save</button>
       <span class="key-status" id="key-status">not set</span>
+    </div>
+
+    <section id="bookings-section">
+      <div class="list-head">
+        <h3>Bookings</h3>
+        <div class="list-actions">
+          <label><input type="checkbox" id="show-past" /> Show past</label>
+          <button type="button" class="btn btn-ghost" id="refresh-list">Refresh</button>
+        </div>
+      </div>
+      <div id="list-error" class="list-error" hidden></div>
+      <div id="bookings-list">
+        <p class="empty">Enter your password above to load bookings.</p>
+      </div>
+    </section>
+
+    <hr class="divider" />
+
+    <div class="section-head" style="margin-bottom:1.5rem">
+      <p class="eyebrow">Manual</p>
+      <h3 style="font-size:1.4rem;letter-spacing:-0.02em;margin:0.4rem 0 0.5rem">Add a booking</h3>
+      <p class="section-sub" style="margin:0">Block off a time directly — for direct-text customers, personal time, or anything that didn't come through the form.</p>
     </div>
 
     <form class="request-form" id="manual-form">
@@ -166,6 +222,7 @@
       if (k) {
         keyInput.value = k;
         markKeyStatus(true);
+        loadBookings();
       }
     }
 
@@ -174,14 +231,169 @@
       keyStatus.classList.toggle("ok", !!set);
     }
 
+    function currentKey() {
+      return (keyInput.value || sessionStorage.getItem(KEY_STORAGE) || "").trim();
+    }
+
     keySave.addEventListener("click", () => {
       const v = keyInput.value.trim();
       if (!v) return;
       sessionStorage.setItem(KEY_STORAGE, v);
       markKeyStatus(true);
+      loadBookings();
     });
 
     loadKey();
+
+    // ---------- Bookings list ----------
+    const listEl = document.getElementById("bookings-list");
+    const listError = document.getElementById("list-error");
+    const refreshBtn = document.getElementById("refresh-list");
+    const showPastEl = document.getElementById("show-past");
+    let lastData = null;
+
+    refreshBtn.addEventListener("click", loadBookings);
+    showPastEl.addEventListener("change", () => renderBookings(lastData));
+
+    async function loadBookings() {
+      const key = currentKey();
+      if (!key) {
+        listEl.innerHTML = `<p class="empty">Enter your password above to load bookings.</p>`;
+        return;
+      }
+      listError.hidden = true;
+      listEl.innerHTML = `<p class="empty">Loading…</p>`;
+
+      try {
+        const res = await fetch(`/.netlify/functions/admin-list?key=${encodeURIComponent(key)}`, {
+          cache: "no-store",
+        });
+        const body = await res.json();
+        if (!res.ok || !body.ok) throw new Error(body.error || `Server returned ${res.status}`);
+        lastData = body;
+        renderBookings(body);
+      } catch (err) {
+        listEl.innerHTML = "";
+        listError.textContent = err.message || "Failed to load bookings.";
+        listError.hidden = false;
+      }
+    }
+
+    function renderBookings(body) {
+      if (!body) return;
+      const today = new Date().toISOString().split("T")[0];
+      const showPast = showPastEl.checked;
+
+      const all = [
+        ...body.pending.map((b) => ({ ...b, _status: "pending" })),
+        ...body.confirmed.map((b) => ({ ...b, _status: "confirmed" })),
+      ].filter((b) => showPast || (b.preferred_date || "") >= today);
+
+      all.sort((a, b) => {
+        const ad = a.preferred_date || "";
+        const bd = b.preferred_date || "";
+        if (ad !== bd) return ad < bd ? -1 : 1;
+        return (timeMin(a.preferred_time) ?? 9999) - (timeMin(b.preferred_time) ?? 9999);
+      });
+
+      if (!all.length) {
+        listEl.innerHTML = `<p class="empty">No ${showPast ? "" : "upcoming "}bookings yet.</p>`;
+        return;
+      }
+
+      listEl.innerHTML = all.map(renderCard).join("");
+
+      // Wire up action buttons.
+      listEl.querySelectorAll("button[data-action]").forEach((btn) => {
+        btn.addEventListener("click", () => doAction(btn.dataset.action, btn.dataset.id, btn));
+      });
+    }
+
+    function renderCard(b) {
+      const isPast = (b.preferred_date || "") < new Date().toISOString().split("T")[0];
+      const pillClass = b._status === "confirmed" ? "confirmed" : "pending";
+      const manualPill = b.manual ? `<span class="pill manual">Manual</span>` : "";
+      const addons = Array.isArray(b.addons) && b.addons.length ? b.addons.join(", ") : "";
+      const dur = b.duration_min ? ` · ${b.duration_min}m override` : "";
+      const customer = [
+        b.name,
+        b.vehicle ? `${b.vehicle}${b.vehicle_size ? ` (${b.vehicle_size})` : ""}` : "",
+        b.phone || "",
+      ].filter(Boolean).join(" · ");
+      const contact = [b.email, b.address].filter(Boolean).join(" · ");
+      const notes = b.notes || "";
+      const actions = b._status === "pending"
+        ? `<button class="btn-confirm" data-action="confirm" data-id="${esc(b.id)}">Confirm</button>
+           <button class="btn-decline" data-action="cancel" data-id="${esc(b.id)}">Decline</button>`
+        : `<button class="btn-cancel" data-action="cancel" data-id="${esc(b.id)}">Cancel booking</button>`;
+
+      return `
+        <article class="booking-card${isPast ? " past" : ""}">
+          <div class="booking-row head">
+            <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
+              <span class="pill ${pillClass}">${b._status}</span>
+              ${manualPill}
+              <span class="booking-when">${esc(formatDate(b.preferred_date))} · ${esc(b.preferred_time || "—")}</span>
+            </div>
+            <span class="booking-id">${esc((b.id || "").slice(0, 8))}</span>
+          </div>
+          <div class="booking-meta">${esc(b.service || "")}${esc(dur)}${addons ? ` · Add-ons: ${esc(addons)}` : ""}</div>
+          ${customer ? `<div class="booking-customer">${esc(customer)}</div>` : ""}
+          ${contact ? `<div class="booking-customer">${esc(contact)}</div>` : ""}
+          ${notes ? `<div class="booking-customer"><b>Notes:</b> ${esc(notes)}</div>` : ""}
+          <div class="booking-actions">${actions}</div>
+        </article>
+      `;
+    }
+
+    async function doAction(action, id, btn) {
+      const key = currentKey();
+      if (!key) return;
+      const verb = action === "confirm" ? "Confirm this booking?" : "Cancel/decline this booking?";
+      if (!confirm(verb)) return;
+
+      btn.disabled = true;
+      const original = btn.textContent;
+      btn.textContent = "…";
+
+      try {
+        const url = `/.netlify/functions/booking-action?action=${action}&id=${encodeURIComponent(id)}&key=${encodeURIComponent(key)}`;
+        const res = await fetch(url, { cache: "no-store" });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`Server returned ${res.status}: ${text.slice(0, 120)}`);
+        }
+      } catch (err) {
+        listError.textContent = err.message || "Action failed.";
+        listError.hidden = false;
+        btn.disabled = false;
+        btn.textContent = original;
+        return;
+      }
+      await loadBookings();
+    }
+
+    function timeMin(t) {
+      const m = String(t || "").match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+      if (!m) return null;
+      let h = parseInt(m[1], 10);
+      const min = parseInt(m[2], 10);
+      const ap = m[3].toUpperCase();
+      if (ap === "PM" && h !== 12) h += 12;
+      if (ap === "AM" && h === 12) h = 0;
+      return h * 60 + min;
+    }
+
+    function formatDate(s) {
+      if (!s) return "—";
+      const d = new Date(s + "T00:00:00");
+      if (isNaN(d)) return s;
+      return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+    }
+
+    function esc(s) {
+      return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+    }
 
     // Default date min — server enforces too.
     const today = new Date().toISOString().split("T")[0];
@@ -244,17 +456,14 @@
         <div class="form-success">
           <p class="eyebrow" style="margin:0 0 6px">Added</p>
           <h3 style="margin:0 0 8px;color:#f3f3f4;font-size:1.4rem;letter-spacing:-0.02em">Booking added ✓</h3>
-          <p style="margin:0 0 4px"><b>${escapeHtml(r.name || "")}</b> — ${escapeHtml(r.service || "")}</p>
-          <p style="margin:0 0 4px">${escapeHtml(r.preferred_date || "")} at ${escapeHtml(r.preferred_time || "")}${r.duration_min ? ` (${r.duration_min} min override)` : ""}</p>
-          ${Array.isArray(r.addons) && r.addons.length ? `<p style="margin:0 0 4px">Add-ons: ${r.addons.map(escapeHtml).join(", ")}</p>` : ""}
-          <p style="margin:12px 0 0;font-size:0.8rem;color:var(--text-mute)">id: ${escapeHtml(body.id || "")}</p>
+          <p style="margin:0 0 4px"><b>${esc(r.name || "")}</b> — ${esc(r.service || "")}</p>
+          <p style="margin:0 0 4px">${esc(r.preferred_date || "")} at ${esc(r.preferred_time || "")}${r.duration_min ? ` (${r.duration_min} min override)` : ""}</p>
+          ${Array.isArray(r.addons) && r.addons.length ? `<p style="margin:0 0 4px">Add-ons: ${r.addons.map(esc).join(", ")}</p>` : ""}
+          <p style="margin:12px 0 0;font-size:0.8rem;color:var(--text-mute)">id: ${esc(body.id || "")}</p>
           <p style="margin:16px 0 0"><a href="/admin.html" style="color:var(--accent)">Add another</a></p>
         </div>
       `;
-    }
-
-    function escapeHtml(s) {
-      return String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+      loadBookings();
     }
   </script>
 </body>

@@ -126,29 +126,48 @@ export default async (req) => {
   const candidateWindow = bookingWindow(candidateBooking);
 
   if (!isFlexibleTime(data.preferred_time) && candidateWindow) {
+    let blobs;
     try {
-      const { blobs } = await confirmedStore.list();
-      const records = await Promise.all(
-        blobs.map((b) => confirmedStore.get(b.key, { type: "json" })),
-      );
-      for (const r of records) {
-        if (!r || r.preferred_date !== data.preferred_date) continue;
-        const w = bookingWindow(r);
-        if (!w) continue;
-        if (rangesOverlap(candidateWindow, w)) {
-          return json(
-            {
-              ok: false,
-              error:
-                "That time overlaps with a booking already on my schedule. Please pick another time and re-submit.",
-            },
-            409,
-          );
-        }
-      }
+      ({ blobs } = await confirmedStore.list());
     } catch (err) {
-      // Don't fail the booking if Blobs is hiccuping — log and continue.
-      console.warn("Availability check failed:", err);
+      console.error("Could not list confirmed bookings for conflict check:", err);
+      return json(
+        {
+          ok: false,
+          error:
+            "Couldn't verify availability — please try again, or text 380-222-1158 to book directly.",
+        },
+        503,
+      );
+    }
+    const records = await Promise.all(
+      blobs.map(async (b) => {
+        try {
+          return await confirmedStore.get(b.key, { type: "json" });
+        } catch (err) {
+          console.error("Failed to read confirmed booking", b.key, err);
+          return null;
+        }
+      }),
+    );
+    for (const r of records) {
+      if (!r || r.preferred_date !== data.preferred_date) continue;
+      const w = bookingWindow(r);
+      if (!w) continue;
+      if (rangesOverlap(candidateWindow, w)) {
+        console.log("Conflict on submit:", {
+          candidate: { date: data.preferred_date, ...candidateWindow, service: data.service },
+          existing: { id: r.id, date: r.preferred_date, time: r.preferred_time, service: r.service, ...w },
+        });
+        return json(
+          {
+            ok: false,
+            error:
+              "That time overlaps with a booking already on my schedule. Please pick another time and re-submit.",
+          },
+          409,
+        );
+      }
     }
   }
 

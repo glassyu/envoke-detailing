@@ -121,13 +121,19 @@ function refreshAllTimeOptions() {
   dateTimePairs.forEach(([dn, tn]) => refreshTimeOptions(dn, tn));
 }
 
+// Re-fetch availability before filtering so we never act on stale data
+// (e.g. owner added a manual booking while this tab was open).
+async function reloadAndRefresh() {
+  await loadAvailability();
+}
+
 dateTimePairs.forEach(([dn, tn]) => {
   const dateEl = document.querySelector(`[name="${dn}"]`);
-  if (dateEl) dateEl.addEventListener("change", () => refreshTimeOptions(dn, tn));
+  if (dateEl) dateEl.addEventListener("change", reloadAndRefresh);
 });
 
 const serviceEl = document.querySelector('[name="service"]');
-if (serviceEl) serviceEl.addEventListener("change", refreshAllTimeOptions);
+if (serviceEl) serviceEl.addEventListener("change", reloadAndRefresh);
 
 loadAvailability();
 
