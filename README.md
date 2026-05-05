@@ -1,8 +1,17 @@
 # Envoke Detailing
 
-Marketing + booking site for Envoke Detailing (Central Columbus, OH).
+Marketing + booking-request site for Envoke Detailing (Central Columbus, OH).
 
 Static HTML/CSS/JS — no build step.
+
+## How booking works
+
+1. Customer fills out the booking-request form on the site (vehicle, service, preferred date + time, etc.).
+2. Submission is delivered to Ryan via Netlify Forms (email + Netlify dashboard).
+3. Ryan texts the customer at the cell number they provided to confirm time + quote.
+4. Detail happens. Customer pays after.
+
+No payment processing on the site. No third-party calendar widget.
 
 ## Run locally
 
@@ -11,14 +20,9 @@ python3 -m http.server 8080
 # open http://localhost:8080
 ```
 
-## Setup before going live
-
-1. **Cal.com link** — create an event type at [cal.com](https://cal.com), then update `CAL_LINK` in `script.js` to match your public link (e.g. `envokedetailing/detail`).
-2. **Form submissions** — the form uses Netlify Forms (`data-netlify="true"`). Submissions go to your Netlify dashboard and email when deployed to Netlify. If you deploy elsewhere, swap the form `action` to a [Formspree](https://formspree.io) endpoint or wire up your own handler.
-
 ## Deploy
 
-### Netlify (recommended)
+### Netlify (recommended — required for the form to work)
 
 ```bash
 # install once
@@ -29,9 +33,13 @@ netlify deploy --prod --dir .
 
 Or drag-and-drop the folder at [app.netlify.com/drop](https://app.netlify.com/drop).
 
+After first deploy, in the Netlify dashboard:
+- **Forms → Settings → Form notifications** — add email notification to `rsabdon@gmail.com`.
+- Optional: connect a Zapier/Make webhook to forward submissions to SMS, Slack, etc.
+
 ## Files
 
-- `index.html` — single-page site (nav, hero, services, add-ons, booking, contact, footer)
+- `index.html` — single-page site (nav, hero, services, add-ons, booking form, footer)
 - `styles.css` — dark premium auto theme, amber accent
-- `script.js` — Cal.com inline embed + footer year
+- `script.js` — date-input min, footer year, post-submit thank-you state
 - `netlify.toml` — Netlify config

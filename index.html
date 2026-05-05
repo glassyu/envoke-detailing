@@ -23,7 +23,6 @@
       <a href="#services">Services</a>
       <a href="#addons">Add-ons</a>
       <a href="#book">Book</a>
-      <a href="#contact">Contact</a>
     </nav>
     <a href="#book" class="btn btn-primary nav-cta">Book a detail</a>
   </header>
@@ -123,20 +122,8 @@
     <section id="book" class="section">
       <div class="section-head">
         <p class="eyebrow">Booking</p>
-        <h2>Pick a time</h2>
-        <p class="section-sub">Open slots are pulled live from my calendar. Pick what works — you'll get a confirmation by email.</p>
-      </div>
-      <div id="cal-inline" class="cal-embed"></div>
-      <noscript>
-        <p class="section-sub" style="text-align:center;margin-top:2rem">Booking calendar requires JavaScript. Email <a href="mailto:rsabdon@gmail.com">rsabdon@gmail.com</a> or call <a href="tel:+13802221158">380-222-1158</a>.</p>
-      </noscript>
-    </section>
-
-    <section id="contact" class="section">
-      <div class="section-head">
-        <p class="eyebrow">Contact</p>
-        <h2>Or send a request</h2>
-        <p class="section-sub">Got a question, a non-standard job, or want a quote first? Drop a note.</p>
+        <h2>Request a slot</h2>
+        <p class="section-sub">Pick a day and time that works for you. I'll review, then text you to confirm — usually within a few hours.</p>
       </div>
 
       <div class="contact-grid">
@@ -144,29 +131,47 @@
           <input type="hidden" name="form-name" value="detailing-request" />
           <p class="hp"><label>Don't fill this out: <input name="bot-field" /></label></p>
 
-          <div class="row">
+          <fieldset>
+            <legend>Contact</legend>
+            <div class="row">
+              <label>
+                <span>Name</span>
+                <input type="text" name="name" required autocomplete="name" />
+              </label>
+              <label>
+                <span>Cell phone</span>
+                <input type="tel" name="phone" required autocomplete="tel" placeholder="(614) 555-0123" />
+              </label>
+            </div>
             <label>
-              <span>Name</span>
-              <input type="text" name="name" required autocomplete="name" />
+              <span>Email</span>
+              <input type="email" name="email" required autocomplete="email" />
             </label>
-            <label>
-              <span>Phone</span>
-              <input type="tel" name="phone" autocomplete="tel" />
-            </label>
-          </div>
+          </fieldset>
 
-          <label>
-            <span>Email</span>
-            <input type="email" name="email" required autocomplete="email" />
-          </label>
+          <fieldset>
+            <legend>Vehicle</legend>
+            <div class="row">
+              <label>
+                <span>Year / make / model</span>
+                <input type="text" name="vehicle" placeholder="2019 Toyota 4Runner" required />
+              </label>
+              <label>
+                <span>Size</span>
+                <select name="vehicle_size" required>
+                  <option value="">Select…</option>
+                  <option>Sedan</option>
+                  <option>SUV</option>
+                  <option>Truck</option>
+                </select>
+              </label>
+            </div>
+          </fieldset>
 
-          <div class="row">
+          <fieldset>
+            <legend>Service</legend>
             <label>
-              <span>Vehicle</span>
-              <input type="text" name="vehicle" placeholder="2019 Toyota 4Runner" required />
-            </label>
-            <label>
-              <span>Service</span>
+              <span>Package</span>
               <select name="service" required>
                 <option value="">Select…</option>
                 <option>Exterior Wash &amp; Shine</option>
@@ -176,15 +181,79 @@
                 <option>Not sure — recommend something</option>
               </select>
             </label>
-          </div>
+            <fieldset class="checkboxes">
+              <legend>Add-ons (optional)</legend>
+              <label class="check"><input type="checkbox" name="addons" value="Pet hair removal" /> <span>Pet hair removal</span></label>
+              <label class="check"><input type="checkbox" name="addons" value="Heavy stain extraction" /> <span>Heavy stain extraction</span></label>
+              <label class="check"><input type="checkbox" name="addons" value="Headlight restoration" /> <span>Headlight restoration</span></label>
+              <label class="check"><input type="checkbox" name="addons" value="Engine bay" /> <span>Engine bay</span></label>
+              <label class="check"><input type="checkbox" name="addons" value="Clay bar" /> <span>Clay bar</span></label>
+              <label class="check"><input type="checkbox" name="addons" value="Ceramic spray topper" /> <span>Ceramic spray topper</span></label>
+            </fieldset>
+          </fieldset>
 
-          <label>
-            <span>Notes</span>
-            <textarea name="notes" rows="4" placeholder="Add-ons, condition, preferred dates, anything else."></textarea>
-          </label>
+          <fieldset>
+            <legend>When works for you?</legend>
+            <div class="row">
+              <label>
+                <span>Preferred date</span>
+                <input type="date" name="preferred_date" required />
+              </label>
+              <label>
+                <span>Preferred time</span>
+                <select name="preferred_time" required>
+                  <option value="">Select…</option>
+                  <option>8:00 AM</option>
+                  <option>9:00 AM</option>
+                  <option>10:00 AM</option>
+                  <option>11:00 AM</option>
+                  <option>12:00 PM</option>
+                  <option>1:00 PM</option>
+                  <option>2:00 PM</option>
+                  <option>3:00 PM</option>
+                  <option>4:00 PM</option>
+                  <option>Flexible — whatever works</option>
+                </select>
+              </label>
+            </div>
+            <div class="row">
+              <label>
+                <span>Backup date <em>(optional)</em></span>
+                <input type="date" name="backup_date" />
+              </label>
+              <label>
+                <span>Backup time <em>(optional)</em></span>
+                <select name="backup_time">
+                  <option value="">—</option>
+                  <option>8:00 AM</option>
+                  <option>9:00 AM</option>
+                  <option>10:00 AM</option>
+                  <option>11:00 AM</option>
+                  <option>12:00 PM</option>
+                  <option>1:00 PM</option>
+                  <option>2:00 PM</option>
+                  <option>3:00 PM</option>
+                  <option>4:00 PM</option>
+                  <option>Flexible</option>
+                </select>
+              </label>
+            </div>
+          </fieldset>
 
-          <button type="submit" class="btn btn-primary">Send request</button>
-          <p class="form-note">I'll reply within a few hours, usually faster.</p>
+          <fieldset>
+            <legend>Location &amp; notes</legend>
+            <label>
+              <span>Where?</span>
+              <input type="text" name="location" placeholder="Your address (mobile) or 'I'll come to you'" />
+            </label>
+            <label>
+              <span>Notes</span>
+              <textarea name="notes" rows="4" placeholder="Vehicle condition, anything I should know, special requests."></textarea>
+            </label>
+          </fieldset>
+
+          <button type="submit" class="btn btn-primary btn-lg">Send booking request</button>
+          <p class="form-note">You'll get a text from 380-222-1158 to confirm. No charge until the work is done.</p>
         </form>
 
         <aside class="contact-info">
@@ -199,7 +268,16 @@
           </div>
           <div>
             <p class="eyebrow">Hours</p>
-            <p>By appointment<br /><span class="muted">See booking calendar for live availability.</span></p>
+            <p>By appointment<br /><span class="muted">Tue – Sat, mornings preferred.</span></p>
+          </div>
+          <div>
+            <p class="eyebrow">How it works</p>
+            <ol class="steps">
+              <li>Send a request</li>
+              <li>I text you to confirm time + quote</li>
+              <li>I show up and detail your vehicle</li>
+              <li>Pay after — cash, card, or Venmo</li>
+            </ol>
           </div>
         </aside>
       </div>
