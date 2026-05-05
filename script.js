@@ -7,7 +7,73 @@ document.querySelectorAll('input[type="date"]').forEach((el) => {
   el.min = today;
 });
 
-// Booking form: submit via fetch to the Netlify Function, show inline success/error.
+// ---------- Availability ----------
+// Pull confirmed (taken) slots from the function and disable them in
+// the time dropdowns whenever the matching date is selected.
+
+const dateTimePairs = [
+  ["preferred_date", "preferred_time"],
+  ["backup_date", "backup_time"],
+];
+
+let takenSlots = []; // [{date, time}, ...]
+
+async function loadAvailability() {
+  try {
+    const res = await fetch("/.netlify/functions/availability", { cache: "no-store" });
+    if (!res.ok) return;
+    const body = await res.json();
+    if (Array.isArray(body.slots)) {
+      takenSlots = body.slots;
+      dateTimePairs.forEach(([dn, tn]) => refreshTimeOptions(dn, tn));
+    }
+  } catch (err) {
+    // Silent — availability is a UX nicety. Server-side check still enforces.
+    console.warn("Could not load availability:", err);
+  }
+}
+
+function refreshTimeOptions(dateName, timeName) {
+  const dateEl = document.querySelector(`[name="${dateName}"]`);
+  const timeEl = document.querySelector(`[name="${timeName}"]`);
+  if (!dateEl || !timeEl) return;
+
+  const date = dateEl.value;
+  const taken = new Set(
+    takenSlots
+      .filter((s) => s.date === date)
+      .map((s) => s.time),
+  );
+
+  let currentBecameUnavailable = false;
+  for (const opt of timeEl.options) {
+    if (!opt.value || /^flexible/i.test(opt.value)) {
+      opt.disabled = false;
+      opt.textContent = opt.value || "Select…";
+      continue;
+    }
+    if (taken.has(opt.value)) {
+      opt.disabled = true;
+      opt.textContent = `${opt.value} — booked`;
+      if (opt.selected) currentBecameUnavailable = true;
+    } else {
+      opt.disabled = false;
+      opt.textContent = opt.value;
+    }
+  }
+  if (currentBecameUnavailable) timeEl.value = "";
+}
+
+dateTimePairs.forEach(([dn, tn]) => {
+  const dateEl = document.querySelector(`[name="${dn}"]`);
+  if (!dateEl) return;
+  dateEl.addEventListener("change", () => refreshTimeOptions(dn, tn));
+});
+
+loadAvailability();
+
+// ---------- Form submission ----------
+
 const form = document.getElementById("booking-form");
 const errorEl = document.getElementById("booking-error");
 const submitBtn = document.getElementById("booking-submit");
@@ -29,6 +95,14 @@ if (form) {
 
       let body = {};
       try { body = await res.json(); } catch { /* ignore */ }
+
+      if (res.status === 409) {
+        // Slot conflict — refresh availability and show the server's message.
+        showError(body.error || "That slot was just booked. Please pick another.");
+        await loadAvailability();
+        setSubmitting(false);
+        return;
+      }
 
       if (!res.ok || !body.ok) {
         throw new Error(body.error || `Server returned ${res.status}`);

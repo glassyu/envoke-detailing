@@ -6,15 +6,34 @@ Static HTML/CSS/JS + a single Netlify Function that sends transactional email vi
 
 ## How booking works
 
-1. Customer fills out the form on the site (vehicle, service, preferred date/time, address, etc.).
+1. Customer fills out the form on the site (vehicle, service, preferred date/time, address, etc.). Already-confirmed slots are grayed out.
 2. Form POSTs to `/.netlify/functions/submit-booking`.
-3. Function calls Resend twice:
-   - **Notification** → `rsabdon@gmail.com` with all the booking details. Reply-to is set to the customer's email so you can reply directly.
+3. Function checks for slot conflicts, stores a pending booking in Netlify Blobs, then sends two emails via Resend:
+   - **Notification** → `rsabdon@gmail.com` with all the booking details and **Confirm / Decline** buttons. Reply-to is the customer's email.
    - **Confirmation** → the customer, telling them you'll text to confirm.
-4. You text the customer at the cell number they provided to lock in time + quote.
-5. Detail happens. Customer pays after.
+4. You click **Confirm booking** in the notification email. The slot is now blocked on the public form so no one else can request it.
+5. You text the customer at the cell number they provided to lock in time + quote.
+6. Detail happens. Customer pays after.
+
+If you need to undo a confirmation, the success page shown after clicking Confirm has a Cancel link — bookmark it or save the email.
 
 No payment processing on the site. No third-party calendar widget.
+
+## Architecture
+
+```
+index.html (form) ──POST──▶ /.netlify/functions/submit-booking
+                                ├─ checks slot in Netlify Blobs (confirmed-bookings)
+                                ├─ stores pending booking in Blobs (pending-bookings)
+                                └─ sends 2 emails via Resend
+
+owner email "Confirm" link ──▶ /.netlify/functions/booking-action?action=confirm
+                                ├─ moves pending → confirmed in Blobs
+                                └─ returns dark-themed status page
+
+index.html (load) ──GET──▶ /.netlify/functions/availability
+                                └─ returns confirmed slot list (date+time only)
+```
 
 ## One-time setup (required before the form will work)
 
@@ -32,10 +51,16 @@ In the Netlify dashboard → Site settings → Environment variables, add:
 | --- | --- |
 | `RESEND_API_KEY` | The key from step 1 |
 | `RESEND_FROM` | `Envoke Detailing <bookings@envokedetailing.com>` (or whatever verified sender you set up) |
+| `ADMIN_KEY` | A random secret. Generate with: `openssl rand -hex 24` |
 | `OWNER_EMAIL` | `rsabdon@gmail.com` (optional — defaults to this) |
 | `OWNER_PHONE` | `380-222-1158` (optional — defaults to this) |
 
+`ADMIN_KEY` is what authorizes the Confirm/Decline links in your email. Anyone with that key + a booking id can confirm/cancel — keep it secret.
+
 Redeploy after adding env vars.
+
+### 3. Netlify Blobs
+Auto-enabled. No setup. Stores `pending-bookings` and `confirmed-bookings` keyed-value pairs. Free tier is plenty.
 
 ## Run locally
 
@@ -63,6 +88,9 @@ Or push to GitHub — if the repo is connected to Netlify it deploys automatical
 
 - `index.html` — single-page site (nav, hero, services, add-ons, booking form, footer)
 - `styles.css` — dark premium auto theme, amber accent
-- `script.js` — date-input min, footer year, fetch-based form submit
-- `netlify/functions/submit-booking.mjs` — Netlify Function that sends both emails via Resend
+- `script.js` — date-input min, footer year, availability fetch, fetch-based form submit
+- `netlify/functions/submit-booking.mjs` — receives form, checks availability, stores pending booking, sends emails
+- `netlify/functions/booking-action.mjs` — owner confirm/cancel endpoint (clicked from notification email)
+- `netlify/functions/availability.mjs` — public endpoint listing taken slots
+- `package.json` — declares `@netlify/blobs` dependency
 - `netlify.toml` — Netlify config

@@ -1,14 +1,20 @@
-// Netlify Function: receives the booking form, sends two emails via Resend.
+// Netlify Function: receives the booking form, checks for slot conflicts,
+// stores a pending booking in Netlify Blobs, and sends two emails via Resend.
 //
 // Required Netlify env vars:
 //   RESEND_API_KEY  — from resend.com/api-keys
 //   RESEND_FROM     — verified sender, e.g. "Envoke Detailing <bookings@envokedetailing.com>"
 //                      (during testing without a verified domain, set to "onboarding@resend.dev"
 //                       — only delivers to your own verified Resend account email)
+//   ADMIN_KEY       — random secret string. Used to authorize the Confirm/Decline links
+//                      in the owner notification email. Generate with `openssl rand -hex 24`.
 //   OWNER_EMAIL     — where booking notifications go (defaults to rsabdon@gmail.com)
 //   OWNER_PHONE     — shown in confirmation email (defaults to 380-222-1158)
 
+import { getStore } from "@netlify/blobs";
+
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
+const SLOT_DELIM = "|";
 
 const REQUIRED_FIELDS = [
   "name",
@@ -49,33 +55,94 @@ export default async (req) => {
 
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM;
+  const adminKey = process.env.ADMIN_KEY;
   if (!apiKey || !from) {
     console.error("Missing RESEND_API_KEY or RESEND_FROM");
     return json({ ok: false, error: "Email service not configured" }, 500);
   }
+  if (!adminKey) {
+    console.error("Missing ADMIN_KEY");
+    return json({ ok: false, error: "Booking system not configured" }, 500);
+  }
   const ownerEmail = process.env.OWNER_EMAIL || "rsabdon@gmail.com";
   const ownerPhone = process.env.OWNER_PHONE || "380-222-1158";
 
+  // Slot conflict check — primary slot only. Backup slots aren't reserved.
+  const slotKey = `${data.preferred_date}${SLOT_DELIM}${data.preferred_time}`;
+  const isFlexible = /^flexible/i.test(String(data.preferred_time));
+  const confirmedStore = getStore("confirmed-bookings");
+  const pendingStore = getStore("pending-bookings");
+
+  if (!isFlexible) {
+    try {
+      const taken = await confirmedStore.get(slotKey, { type: "json" });
+      if (taken) {
+        return json(
+          {
+            ok: false,
+            error:
+              "That slot was just booked by someone else. Please pick another time and re-submit.",
+          },
+          409,
+        );
+      }
+    } catch (err) {
+      // Don't fail the booking if Blobs is hiccuping — log and continue.
+      console.warn("Availability check failed:", err);
+    }
+  }
+
   const addons = normalizeAddons(data.addons);
-  const summary = buildSummary(data, addons);
-  const firstName = String(data.name).trim().split(/\s+/)[0];
+  const id = generateId();
+  const pendingRecord = {
+    id,
+    requestedAt: new Date().toISOString(),
+    name: String(data.name).trim(),
+    email: String(data.email).trim(),
+    phone: String(data.phone).trim(),
+    vehicle: String(data.vehicle).trim(),
+    vehicle_size: String(data.vehicle_size).trim(),
+    service: String(data.service).trim(),
+    preferred_date: String(data.preferred_date).trim(),
+    preferred_time: String(data.preferred_time).trim(),
+    backup_date: data.backup_date ? String(data.backup_date).trim() : "",
+    backup_time: data.backup_time ? String(data.backup_time).trim() : "",
+    address: String(data.address).trim(),
+    utilities: data.utilities ? String(data.utilities).trim() : "",
+    notes: data.notes ? String(data.notes).trim() : "",
+    addons,
+  };
+
+  try {
+    await pendingStore.set(id, JSON.stringify(pendingRecord));
+  } catch (err) {
+    console.error("Failed to store pending booking:", err);
+    // Still send the email so the request isn't lost — owner can act manually.
+  }
+
+  const siteUrl = process.env.URL || `https://${req.headers.get("host") || ""}`;
+  const confirmUrl = buildActionUrl(siteUrl, "confirm", id, adminKey);
+  const cancelUrl = buildActionUrl(siteUrl, "cancel", id, adminKey);
+
+  const summary = buildSummary(pendingRecord, addons);
+  const firstName = pendingRecord.name.split(/\s+/)[0];
 
   const ownerEmailReq = sendEmail(apiKey, {
     from,
     to: ownerEmail,
-    reply_to: data.email,
-    subject: `New booking — ${data.name} · ${data.vehicle}`,
-    text: buildOwnerText(data, summary),
-    html: buildOwnerHtml(data, summary),
+    reply_to: pendingRecord.email,
+    subject: `New booking — ${pendingRecord.name} · ${pendingRecord.vehicle}`,
+    text: buildOwnerText(pendingRecord, summary, confirmUrl, cancelUrl),
+    html: buildOwnerHtml(pendingRecord, summary, confirmUrl, cancelUrl),
   });
 
   const customerEmailReq = sendEmail(apiKey, {
     from,
-    to: data.email,
+    to: pendingRecord.email,
     reply_to: ownerEmail,
     subject: "We got your request — Envoke Detailing",
-    text: buildCustomerText(firstName, data, summary, ownerPhone, ownerEmail),
-    html: buildCustomerHtml(firstName, data, summary, ownerPhone, ownerEmail),
+    text: buildCustomerText(firstName, pendingRecord, summary, ownerPhone, ownerEmail),
+    html: buildCustomerHtml(firstName, pendingRecord, summary, ownerPhone, ownerEmail),
   });
 
   // Owner email is critical; customer email is nice-to-have.
@@ -98,6 +165,21 @@ export default async (req) => {
 
   return json({ ok: true });
 };
+
+function generateId() {
+  // 16-byte random id, hex-encoded.
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function buildActionUrl(siteUrl, action, id, key) {
+  const u = new URL(`${siteUrl.replace(/\/$/, "")}/.netlify/functions/booking-action`);
+  u.searchParams.set("action", action);
+  u.searchParams.set("id", id);
+  u.searchParams.set("key", key);
+  return u.toString();
+}
 
 // ---------- helpers ----------
 
@@ -163,7 +245,7 @@ function summaryToHtml(summary) {
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;margin:8px 0">${rows}</table>`;
 }
 
-function buildOwnerText(d, summary) {
+function buildOwnerText(d, summary, confirmUrl, cancelUrl) {
   return `New booking request from ${d.name}
 
 Contact:
@@ -172,10 +254,29 @@ Contact:
 
 ${summaryToText(summary)}
 
+Confirm this booking (blocks the slot on the public form):
+${confirmUrl}
+
+Decline (does nothing to availability):
+${cancelUrl}
+
 Reply directly to this email to respond to ${d.name}.`;
 }
 
-function buildOwnerHtml(d, summary) {
+function buildOwnerHtml(d, summary, confirmUrl, cancelUrl) {
+  const actions = `
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 8px;border-collapse:collapse">
+      <tr>
+        <td style="padding:0 8px 0 0">
+          <a href="${escapeAttr(confirmUrl)}" style="display:inline-block;background:#c9a44c;color:#1a1408;text-decoration:none;font-weight:600;font-size:14px;padding:12px 22px;border-radius:999px;letter-spacing:-0.005em">Confirm booking</a>
+        </td>
+        <td style="padding:0">
+          <a href="${escapeAttr(cancelUrl)}" style="display:inline-block;background:transparent;color:#f3f3f4;text-decoration:none;font-weight:500;font-size:14px;padding:11px 21px;border:1px solid #2c313b;border-radius:999px;letter-spacing:-0.005em">Decline</a>
+        </td>
+      </tr>
+    </table>
+    <p style="margin:8px 0 0;color:#6b6e76;font-size:12px;line-height:1.5">Confirming blocks this date+time on the public form so no one else can request it.</p>
+  `;
   return wrapHtml(
     `<p style="margin:0 0 8px;color:#c9a44c;font-size:11px;text-transform:uppercase;letter-spacing:0.18em;font-weight:500">New booking</p>
      <h1 style="margin:0 0 18px;color:#f3f3f4;font-size:24px;font-weight:600;letter-spacing:-0.02em;line-height:1.2">${escapeHtml(d.name)} — ${escapeHtml(d.vehicle)}</h1>
@@ -185,8 +286,19 @@ function buildOwnerHtml(d, summary) {
        <a href="tel:${escapeHtml(d.phone)}" style="color:#c9a44c;text-decoration:none">${escapeHtml(d.phone)}</a>
      </p>
      ${summaryToHtml(summary)}
-     <p style="margin:24px 0 0;color:#6b6e76;font-size:13px;line-height:1.5">Reply directly to this email to respond to ${escapeHtml(d.name)}, or text them at ${escapeHtml(d.phone)}.</p>`,
+     ${actions}
+     <p style="margin:24px 0 0;color:#6b6e76;font-size:13px;line-height:1.5">Reply directly to this email to talk to ${escapeHtml(d.name)}, or text them at ${escapeHtml(d.phone)}.</p>`,
   );
+}
+
+function escapeAttr(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[c]);
 }
 
 function buildCustomerText(firstName, d, summary, ownerPhone, ownerEmail) {
