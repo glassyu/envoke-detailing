@@ -154,11 +154,13 @@ function summaryToText(summary) {
 function summaryToHtml(summary) {
   const rows = summary
     .map(
-      ([k, v]) =>
-        `<tr><td style="padding:6px 12px 6px 0;color:#888;font-size:13px;text-transform:uppercase;letter-spacing:.05em;vertical-align:top;white-space:nowrap">${escapeHtml(k)}</td><td style="padding:6px 0;color:#111;font-size:15px;vertical-align:top">${escapeHtml(v)}</td></tr>`,
+      ([k, v], i) => {
+        const borderTop = i === 0 ? "" : "border-top:1px solid #20242c;";
+        return `<tr><td style="${borderTop}padding:12px 16px 12px 0;color:#6b6e76;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;font-weight:500;vertical-align:top;white-space:nowrap">${escapeHtml(k)}</td><td style="${borderTop}padding:12px 0;color:#f3f3f4;font-size:15px;vertical-align:top">${escapeHtml(v)}</td></tr>`;
+      },
     )
     .join("");
-  return `<table style="border-collapse:collapse;width:100%">${rows}</table>`;
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;margin:8px 0">${rows}</table>`;
 }
 
 function buildOwnerText(d, summary) {
@@ -175,10 +177,15 @@ Reply directly to this email to respond to ${d.name}.`;
 
 function buildOwnerHtml(d, summary) {
   return wrapHtml(
-    `<h2 style="margin:0 0 16px;font-size:20px">New booking request</h2>
-     <p style="margin:0 0 20px;color:#333">From <b>${escapeHtml(d.name)}</b> · <a href="mailto:${escapeHtml(d.email)}">${escapeHtml(d.email)}</a> · <a href="tel:${escapeHtml(d.phone)}">${escapeHtml(d.phone)}</a></p>
+    `<p style="margin:0 0 8px;color:#c9a44c;font-size:11px;text-transform:uppercase;letter-spacing:0.18em;font-weight:500">New booking</p>
+     <h1 style="margin:0 0 18px;color:#f3f3f4;font-size:24px;font-weight:600;letter-spacing:-0.02em;line-height:1.2">${escapeHtml(d.name)} — ${escapeHtml(d.vehicle)}</h1>
+     <p style="margin:0 0 24px;color:#a1a4ac;font-size:14px">
+       <a href="mailto:${escapeHtml(d.email)}" style="color:#c9a44c;text-decoration:none">${escapeHtml(d.email)}</a>
+       <span style="color:#3a3f47;margin:0 8px">·</span>
+       <a href="tel:${escapeHtml(d.phone)}" style="color:#c9a44c;text-decoration:none">${escapeHtml(d.phone)}</a>
+     </p>
      ${summaryToHtml(summary)}
-     <p style="margin:24px 0 0;color:#666;font-size:13px">Reply directly to this email to respond to ${escapeHtml(d.name)}.</p>`,
+     <p style="margin:24px 0 0;color:#6b6e76;font-size:13px;line-height:1.5">Reply directly to this email to respond to ${escapeHtml(d.name)}, or text them at ${escapeHtml(d.phone)}.</p>`,
   );
 }
 
@@ -203,17 +210,45 @@ ${ownerEmail}`;
 
 function buildCustomerHtml(firstName, d, summary, ownerPhone, ownerEmail) {
   return wrapHtml(
-    `<h2 style="margin:0 0 16px;font-size:20px">Thanks, ${escapeHtml(firstName)} — I got your request.</h2>
-     <p style="margin:0 0 16px;color:#333">I'll review and text you at <b>${escapeHtml(d.phone)}</b> within a few hours to confirm the time and quote you a price. No charge until the work is done.</p>
-     <p style="margin:0 0 8px;color:#666;font-size:13px;text-transform:uppercase;letter-spacing:.06em">Your request</p>
+    `<p style="margin:0 0 8px;color:#c9a44c;font-size:11px;text-transform:uppercase;letter-spacing:0.18em;font-weight:500">Request received</p>
+     <h1 style="margin:0 0 18px;color:#f3f3f4;font-size:26px;font-weight:600;letter-spacing:-0.025em;line-height:1.2">Thanks, ${escapeHtml(firstName)} — I got it.</h1>
+     <p style="margin:0 0 28px;color:#a1a4ac;font-size:15px;line-height:1.6">I'll review your request and text you at <span style="color:#f3f3f4">${escapeHtml(d.phone)}</span> within a few hours to confirm the time and quote you a price. No charge until the work is done.</p>
+     <p style="margin:0 0 4px;color:#c9a44c;font-size:11px;text-transform:uppercase;letter-spacing:0.18em;font-weight:500">Your request</p>
      ${summaryToHtml(summary)}
-     <p style="margin:24px 0 0;color:#333">If anything's wrong, reply to this email or text me at <a href="tel:${escapeHtml(ownerPhone)}">${escapeHtml(ownerPhone)}</a>.</p>
-     <p style="margin:24px 0 0;color:#333">— Ryan<br><b>Envoke Detailing</b><br>${escapeHtml(ownerPhone)} · <a href="mailto:${escapeHtml(ownerEmail)}">${escapeHtml(ownerEmail)}</a></p>`,
+     <p style="margin:28px 0 0;padding-top:24px;border-top:1px solid #20242c;color:#a1a4ac;font-size:14px;line-height:1.6">If anything's wrong, reply to this email or text me at <a href="tel:${escapeHtml(ownerPhone)}" style="color:#c9a44c;text-decoration:none">${escapeHtml(ownerPhone)}</a>.</p>
+     <p style="margin:24px 0 0;color:#f3f3f4;font-size:14px;line-height:1.7">— Ryan<br><span style="color:#c9a44c;font-size:13px;letter-spacing:0.05em">◆</span> <span style="color:#f3f3f4;font-weight:600">Envoke Detailing</span><br><span style="color:#a1a4ac">${escapeHtml(ownerPhone)} · <a href="mailto:${escapeHtml(ownerEmail)}" style="color:#a1a4ac;text-decoration:none">${escapeHtml(ownerEmail)}</a></span></p>`,
   );
 }
 
 function wrapHtml(inner) {
-  return `<!doctype html><html><body style="margin:0;padding:24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f5"><div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;color:#111;line-height:1.55">${inner}</div></body></html>`;
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="supported-color-schemes" content="dark">
+<title>Envoke Detailing</title>
+</head>
+<body style="margin:0;padding:0;background:#08090b;color:#f3f3f4;-webkit-font-smoothing:antialiased">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#08090b;padding:32px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+  <tr><td align="center">
+    <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;background:#101216;border:1px solid #20242c;border-radius:18px;overflow:hidden">
+      <tr><td style="padding:24px 32px;border-bottom:1px solid #20242c">
+        <span style="color:#c9a44c;font-size:14px;letter-spacing:0.05em">◆</span>
+        <span style="color:#f3f3f4;font-weight:600;font-size:15px;letter-spacing:-0.01em;margin-left:8px;vertical-align:middle">Envoke Detailing</span>
+      </td></tr>
+      <tr><td style="padding:32px;color:#f3f3f4;line-height:1.55">
+        ${inner}
+      </td></tr>
+      <tr><td style="padding:18px 32px;border-top:1px solid #20242c;color:#6b6e76;font-size:12px;letter-spacing:0.02em">
+        Mobile detailing · Central Columbus, OH
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>`;
 }
 
 function escapeHtml(s) {
