@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Admin — Envoke Detailing</title>
+  <link rel="preconnect" href="https://rsms.me/" />
+  <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .admin-wrap { max-width: 720px; margin: 0 auto; padding: 3rem 1.5rem 5rem; }
+    .admin-head { margin-bottom: 2rem; }
+    .key-panel { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 1rem; }
+    .key-panel input { flex: 1; background: var(--bg); border: 1px solid var(--border-strong); color: var(--text); border-radius: var(--radius); padding: 0.6rem 0.75rem; font: inherit; font-size: 0.9rem; }
+    .key-panel button { padding: 0.55rem 1rem; font-size: 0.85rem; }
+    .key-status { font-size: 0.78rem; color: var(--text-mute); white-space: nowrap; }
+    .key-status.ok { color: #65d18d; }
+    .form-success { background: rgba(101, 209, 141, 0.08); border: 1px solid rgba(101, 209, 141, 0.35); border-radius: var(--radius); padding: 1rem; color: #b8e6c8; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <header class="nav">
+    <a href="/" class="brand">
+      <span class="brand-mark">◆</span>
+      <span class="brand-name">Envoke Detailing — Admin</span>
+    </a>
+    <a href="/" class="btn btn-ghost nav-cta">Back to site</a>
+  </header>
+
+  <main class="admin-wrap">
+    <div class="admin-head section-head">
+      <p class="eyebrow">Admin</p>
+      <h2>Manual booking</h2>
+      <p class="section-sub">Block off a time slot directly. Useful for direct-text customers, personal time, or anything else that didn't come through the form.</p>
+    </div>
+
+    <div class="key-panel">
+      <label style="flex:1;display:flex;flex-direction:column;gap:0.3rem">
+        <span style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-mute);font-weight:500">Admin key</span>
+        <input type="password" id="admin-key" autocomplete="current-password" placeholder="Paste ADMIN_KEY value" />
+      </label>
+      <button type="button" class="btn btn-ghost" id="key-save">Save</button>
+      <span class="key-status" id="key-status">not set</span>
+    </div>
+
+    <form class="request-form" id="manual-form">
+      <fieldset>
+        <legend>When</legend>
+        <div class="row">
+          <label>
+            <span>Date</span>
+            <input type="date" name="date" required />
+          </label>
+          <label>
+            <span>Start time</span>
+            <select name="time" required>
+              <option value="">Select…</option>
+              <option>9:00 AM</option>
+              <option>10:00 AM</option>
+              <option>11:00 AM</option>
+              <option>12:00 PM</option>
+              <option>1:00 PM</option>
+              <option>2:00 PM</option>
+              <option>3:00 PM</option>
+              <option>4:00 PM</option>
+              <option>5:00 PM</option>
+              <option>6:00 PM</option>
+              <option>7:00 PM</option>
+              <option>8:00 PM</option>
+              <option>Flexible</option>
+            </select>
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Service</legend>
+        <div class="row">
+          <label>
+            <span>Type</span>
+            <select name="service" required>
+              <option value="">Select…</option>
+              <option>Exterior Wash &amp; Shine</option>
+              <option>Interior Detail</option>
+              <option>Full Detail</option>
+              <option>Premium Full Detail</option>
+              <option>Not sure — recommend something</option>
+            </select>
+          </label>
+          <label>
+            <span>Duration override <em>(min, optional)</em></span>
+            <input type="number" name="duration_min" min="15" step="15" placeholder="leave blank for service default" />
+          </label>
+        </div>
+        <fieldset class="checkboxes">
+          <legend>Add-ons (optional)</legend>
+          <label class="check"><input type="checkbox" name="addons" value="Pet hair removal" /> <span>Pet hair removal</span></label>
+          <label class="check"><input type="checkbox" name="addons" value="Heavy stain extraction" /> <span>Heavy stain extraction</span></label>
+          <label class="check"><input type="checkbox" name="addons" value="Headlight restoration" /> <span>Headlight restoration</span></label>
+          <label class="check"><input type="checkbox" name="addons" value="Engine bay" /> <span>Engine bay</span></label>
+          <label class="check"><input type="checkbox" name="addons" value="Clay bar" /> <span>Clay bar</span></label>
+          <label class="check"><input type="checkbox" name="addons" value="Ceramic spray topper" /> <span>Ceramic spray topper</span></label>
+        </fieldset>
+      </fieldset>
+
+      <fieldset>
+        <legend>Customer / label <span style="text-transform:none;letter-spacing:0;color:var(--text-mute);font-weight:400">(optional, for your reference)</span></legend>
+        <label>
+          <span>Name / label</span>
+          <input type="text" name="name" placeholder="e.g. 'John (text booking)' or 'Personal — dentist'" />
+        </label>
+        <div class="row">
+          <label>
+            <span>Phone</span>
+            <input type="tel" name="phone" />
+          </label>
+          <label>
+            <span>Email</span>
+            <input type="email" name="email" />
+          </label>
+        </div>
+        <div class="row">
+          <label>
+            <span>Vehicle</span>
+            <input type="text" name="vehicle" />
+          </label>
+          <label>
+            <span>Size</span>
+            <select name="vehicle_size">
+              <option value="">—</option>
+              <option>Sedan</option>
+              <option>SUV</option>
+              <option>Truck</option>
+            </select>
+          </label>
+        </div>
+        <label>
+          <span>Address</span>
+          <input type="text" name="address" />
+        </label>
+        <label>
+          <span>Notes</span>
+          <textarea name="notes" rows="3"></textarea>
+        </label>
+      </fieldset>
+
+      <label class="check" style="margin-top:0.5rem">
+        <input type="checkbox" name="force" />
+        <span>Force-add even if it overlaps another booking</span>
+      </label>
+
+      <button type="submit" class="btn btn-primary btn-lg" id="manual-submit">Add booking</button>
+      <p class="form-error" id="manual-error" hidden></p>
+    </form>
+  </main>
+
+  <script>
+    const KEY_STORAGE = "envoke_admin_key";
+    const keyInput = document.getElementById("admin-key");
+    const keySave = document.getElementById("key-save");
+    const keyStatus = document.getElementById("key-status");
+
+    function loadKey() {
+      const k = sessionStorage.getItem(KEY_STORAGE);
+      if (k) {
+        keyInput.value = k;
+        markKeyStatus(true);
+      }
+    }
+
+    function markKeyStatus(set) {
+      keyStatus.textContent = set ? "saved this session" : "not set";
+      keyStatus.classList.toggle("ok", !!set);
+    }
+
+    keySave.addEventListener("click", () => {
+      const v = keyInput.value.trim();
+      if (!v) return;
+      sessionStorage.setItem(KEY_STORAGE, v);
+      markKeyStatus(true);
+    });
+
+    loadKey();
+
+    // Default date min — server enforces too.
+    const today = new Date().toISOString().split("T")[0];
+    document.querySelectorAll('input[type="date"]').forEach((el) => (el.min = today));
+
+    const form = document.getElementById("manual-form");
+    const errEl = document.getElementById("manual-error");
+    const submitBtn = document.getElementById("manual-submit");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errEl.hidden = true;
+      const key = (keyInput.value || sessionStorage.getItem(KEY_STORAGE) || "").trim();
+      if (!key) {
+        showError("Enter your admin key first.");
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Adding…";
+
+      const fd = new FormData(form);
+      const data = { key };
+      const addons = [];
+      for (const [k, v] of fd.entries()) {
+        if (k === "addons") addons.push(v);
+        else if (k === "force") data.force = true;
+        else data[k] = v;
+      }
+      if (addons.length) data.addons = addons;
+      if (data.duration_min === "") delete data.duration_min;
+      else if (data.duration_min) data.duration_min = Number(data.duration_min);
+
+      try {
+        const res = await fetch("/.netlify/functions/manual-booking", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        });
+        let body = {};
+        try { body = await res.json(); } catch { /* ignore */ }
+        if (!res.ok || !body.ok) throw new Error(body.error || `Server returned ${res.status}`);
+
+        showSuccess(body);
+      } catch (err) {
+        showError(err.message || "Failed to add booking.");
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Add booking";
+      }
+    });
+
+    function showError(msg) {
+      errEl.textContent = msg;
+      errEl.hidden = false;
+    }
+
+    function showSuccess(body) {
+      const r = body.record || {};
+      form.innerHTML = `
+        <div class="form-success">
+          <p class="eyebrow" style="margin:0 0 6px">Added</p>
+          <h3 style="margin:0 0 8px;color:#f3f3f4;font-size:1.4rem;letter-spacing:-0.02em">Booking added ✓</h3>
+          <p style="margin:0 0 4px"><b>${escapeHtml(r.name || "")}</b> — ${escapeHtml(r.service || "")}</p>
+          <p style="margin:0 0 4px">${escapeHtml(r.preferred_date || "")} at ${escapeHtml(r.preferred_time || "")}${r.duration_min ? ` (${r.duration_min} min override)` : ""}</p>
+          ${Array.isArray(r.addons) && r.addons.length ? `<p style="margin:0 0 4px">Add-ons: ${r.addons.map(escapeHtml).join(", ")}</p>` : ""}
+          <p style="margin:12px 0 0;font-size:0.8rem;color:var(--text-mute)">id: ${escapeHtml(body.id || "")}</p>
+          <p style="margin:16px 0 0"><a href="/admin.html" style="color:var(--accent)">Add another</a></p>
+        </div>
+      `;
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+    }
+  </script>
+</body>
+</html>

@@ -52,11 +52,18 @@ export function isFlexibleTime(time) {
 // booking has no resolvable window (flexible-time, unparseable, or otherwise
 // not a fixed slot). Callers treat null as "doesn't block anything" — the
 // owner handles those manually over text.
+//
+// `booking.duration_min` overrides the service-default duration when set,
+// useful for manual bookings that don't follow the standard menu durations.
 export function bookingWindow(booking) {
   if (isFlexibleTime(booking.preferred_time)) return null;
   const start = timeToMinutes(booking.preferred_time);
   if (start == null) return null;
-  const dur = durationFor(booking.service) + BUFFER_MIN;
+  const baseDur =
+    typeof booking.duration_min === "number" && booking.duration_min > 0
+      ? booking.duration_min
+      : durationFor(booking.service);
+  const dur = baseDur + BUFFER_MIN;
   return { start, end: start + dur };
 }
 

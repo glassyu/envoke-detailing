@@ -84,13 +84,20 @@ netlify deploy --prod --dir .
 
 Or push to GitHub — if the repo is connected to Netlify it deploys automatically.
 
+## Admin
+
+Visit `/admin.html` on the deployed site to manually add bookings (direct-text customers, personal time blocks, anything that didn't come through the public form). Paste your `ADMIN_KEY` once — it's saved to `sessionStorage` for the tab. The form supports a `duration_min` override for non-standard service durations and a `force` checkbox to bypass overlap detection.
+
 ## Files
 
 - `index.html` — single-page site (nav, hero, services, add-ons, booking form, footer)
+- `admin.html` — admin page for adding manual bookings
 - `styles.css` — dark premium auto theme, amber accent
 - `script.js` — date-input min, footer year, availability fetch, fetch-based form submit
 - `netlify/functions/submit-booking.mjs` — receives form, checks availability, stores pending booking, sends emails
 - `netlify/functions/booking-action.mjs` — owner confirm/cancel endpoint (clicked from notification email)
+- `netlify/functions/manual-booking.mjs` — admin-only endpoint to create confirmed bookings directly
 - `netlify/functions/availability.mjs` — public endpoint listing taken slots
+- `netlify/functions/_services.mjs` — shared scheduling/duration config (do NOT deploy as endpoint — underscore prefix)
 - `package.json` — declares `@netlify/blobs` dependency
 - `netlify.toml` — Netlify config
