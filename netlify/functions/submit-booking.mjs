@@ -17,6 +17,10 @@ import {
   durationFor,
   isFlexibleTime,
   rangesOverlap,
+  timeToMinutes,
+  WORK_START_MIN,
+  WORK_END_MIN,
+  MIN_BOOKING_DATE,
 } from "./_services.mjs";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
@@ -56,6 +60,42 @@ export default async (req) => {
 
   if (!isEmail(data.email)) {
     return json({ ok: false, error: "Invalid email" }, 400);
+  }
+
+  // Date floor: bookings start MIN_BOOKING_DATE.
+  if (data.preferred_date < MIN_BOOKING_DATE) {
+    return json(
+      { ok: false, error: `Bookings start ${MIN_BOOKING_DATE}. Please pick that date or later.` },
+      400,
+    );
+  }
+  if (data.backup_date && data.backup_date < MIN_BOOKING_DATE) {
+    return json(
+      { ok: false, error: `Backup date must be ${MIN_BOOKING_DATE} or later.` },
+      400,
+    );
+  }
+
+  // Work-hours window: start ≥ 9 AM and start + duration ≤ 8 PM. Skip for
+  // flexible-time requests since the customer is leaving timing to Ryan.
+  if (!isFlexibleTime(data.preferred_time)) {
+    const start = timeToMinutes(data.preferred_time);
+    if (start == null) {
+      return json({ ok: false, error: "Invalid preferred time format." }, 400);
+    }
+    const dur = durationFor(data.service);
+    if (start < WORK_START_MIN) {
+      return json({ ok: false, error: "Earliest start time is 9:00 AM." }, 400);
+    }
+    if (start + dur > WORK_END_MIN) {
+      return json(
+        {
+          ok: false,
+          error: `That start time wouldn't finish by 8:00 PM. Pick an earlier time or a shorter service.`,
+        },
+        400,
+      );
+    }
   }
 
   const apiKey = process.env.RESEND_API_KEY;

@@ -1,6 +1,6 @@
-// Shared service-duration config used by availability, submit-booking, and
-// booking-action. Underscore-prefixed file → Netlify treats it as a helper
-// rather than deploying it as an HTTP endpoint.
+// Shared service-duration + scheduling config used by availability,
+// submit-booking, and booking-action. Underscore-prefixed file → Netlify
+// treats it as a helper rather than deploying it as an HTTP endpoint.
 
 export const SERVICE_DURATIONS_MIN = {
   "Exterior Wash & Shine": 60,
@@ -16,6 +16,16 @@ export const SERVICE_DURATIONS_MIN = {
 export const BUFFER_MIN = 30;
 
 export const DEFAULT_DURATION_MIN = 240;
+
+// Work hours (Mon–Sun). All times are minutes since midnight.
+// Customers can start jobs no earlier than WORK_START_MIN and the job's
+// service duration must finish by WORK_END_MIN.
+export const WORK_START_MIN = 9 * 60; // 9:00 AM
+export const WORK_END_MIN = 20 * 60; // 8:00 PM
+
+// Earliest date customers can book. Format: YYYY-MM-DD. Bumped forward when
+// you want to push the booking calendar out; not auto-rolling.
+export const MIN_BOOKING_DATE = "2026-05-11";
 
 export function durationFor(service) {
   const v = SERVICE_DURATIONS_MIN[service];

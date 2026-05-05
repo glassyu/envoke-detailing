@@ -1,7 +1,8 @@
 // Footer year
 document.getElementById("year").textContent = new Date().getFullYear();
 
-// Block past dates on date inputs
+// Block past dates on date inputs. The actual floor is also pushed forward
+// once availability loads (MIN_BOOKING_DATE from the server config).
 const today = new Date().toISOString().split("T")[0];
 document.querySelectorAll('input[type="date"]').forEach((el) => {
   el.min = today;
@@ -21,6 +22,9 @@ const dateTimePairs = [
 let busyWindows = []; // [{date, start, end}] minutes since midnight
 let serviceDurations = {};
 let bufferMin = 30;
+let workStartMin = 9 * 60;
+let workEndMin = 20 * 60;
+let minBookingDate = null;
 
 async function loadAvailability() {
   try {
@@ -30,11 +34,24 @@ async function loadAvailability() {
     busyWindows = Array.isArray(body.busy) ? body.busy : [];
     serviceDurations = body.durations || {};
     bufferMin = typeof body.bufferMin === "number" ? body.bufferMin : 30;
+    if (typeof body.workStartMin === "number") workStartMin = body.workStartMin;
+    if (typeof body.workEndMin === "number") workEndMin = body.workEndMin;
+    if (body.minDate) minBookingDate = body.minDate;
+    applyDateFloor();
     refreshAllTimeOptions();
   } catch (err) {
     // Silent — availability is a UX nicety. Server-side check still enforces.
     console.warn("Could not load availability:", err);
   }
+}
+
+function applyDateFloor() {
+  if (!minBookingDate) return;
+  const floor = minBookingDate > today ? minBookingDate : today;
+  document.querySelectorAll('input[type="date"]').forEach((el) => {
+    el.min = floor;
+    if (el.value && el.value < floor) el.value = "";
+  });
 }
 
 function timeToMinutes(time) {
@@ -69,24 +86,32 @@ function refreshTimeOptions(dateName, timeName) {
     if (opt.value) opt.textContent = opt.value;
   }
 
-  // No date or no service → server enforces on submit, leave it open.
-  if (!date || !serviceDur) return;
-
-  const totalDur = serviceDur + bufferMin;
-  const dayBusy = busyWindows.filter((b) => b.date === date);
-  if (!dayBusy.length) return;
-
   let currentBecameUnavailable = false;
+  const dayBusy = date ? busyWindows.filter((b) => b.date === date) : [];
+
   for (const opt of timeEl.options) {
     if (!opt.value || /^flexible/i.test(opt.value)) continue;
     const start = timeToMinutes(opt.value);
     if (start == null) continue;
-    const end = start + totalDur;
-    const conflict = dayBusy.some((b) => start < b.end && b.start < end);
-    if (conflict) {
+
+    // Out-of-hours: end time runs past close. Service-aware, so a 1-hour
+    // wash at 7 PM is fine but a 5-hour Premium at 7 PM is not.
+    if (serviceDur != null && start + serviceDur > workEndMin) {
       opt.disabled = true;
-      opt.textContent = `${opt.value} — unavailable`;
+      opt.textContent = `${opt.value} — too late`;
       if (opt.selected) currentBecameUnavailable = true;
+      continue;
+    }
+
+    // Conflict with an existing confirmed booking on the same date.
+    if (serviceDur != null && date && dayBusy.length) {
+      const end = start + serviceDur + bufferMin;
+      const conflict = dayBusy.some((b) => start < b.end && b.start < end);
+      if (conflict) {
+        opt.disabled = true;
+        opt.textContent = `${opt.value} — unavailable`;
+        if (opt.selected) currentBecameUnavailable = true;
+      }
     }
   }
   if (currentBecameUnavailable) timeEl.value = "";

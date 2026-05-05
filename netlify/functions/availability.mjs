@@ -15,6 +15,9 @@ import { getStore } from "@netlify/blobs";
 import {
   SERVICE_DURATIONS_MIN,
   BUFFER_MIN,
+  WORK_START_MIN,
+  WORK_END_MIN,
+  MIN_BOOKING_DATE,
   bookingWindow,
 } from "./_services.mjs";
 
@@ -40,7 +43,14 @@ export default async () => {
   }
 
   return new Response(
-    JSON.stringify({ busy, durations: SERVICE_DURATIONS_MIN, bufferMin: BUFFER_MIN }),
+    JSON.stringify({
+      busy,
+      durations: SERVICE_DURATIONS_MIN,
+      bufferMin: BUFFER_MIN,
+      workStartMin: WORK_START_MIN,
+      workEndMin: WORK_END_MIN,
+      minDate: MIN_BOOKING_DATE,
+    }),
     {
       status: 200,
       headers: {
