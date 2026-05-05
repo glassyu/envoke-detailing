@@ -1,15 +1,16 @@
 // Owner-only endpoint: the Confirm/Decline buttons in Ryan's notification
 // emails link here. Action-keyed by ?action=confirm|cancel&id=<id>&key=<ADMIN_KEY>.
 //
-// - confirm: moves a pending booking → confirmed (slot becomes taken)
+// - confirm: moves a pending booking → confirmed (slot becomes taken, blocking
+//            the duration window of that service plus a buffer)
 // - cancel:  removes a booking from either pending or confirmed (slot frees up)
 //
-// Returns a self-contained dark-themed HTML page so Ryan gets a clear visual
-// confirmation in the browser when he clicks the email button.
+// Confirmed bookings are keyed by their booking id. The blob value contains
+// preferred_date / preferred_time / service so availability and conflict
+// checks can compute the time window for each.
 
 import { getStore } from "@netlify/blobs";
-
-const SLOT_DELIM = "|";
+import { bookingWindow, rangesOverlap, isFlexibleTime } from "./_services.mjs";
 
 export default async (req) => {
   const url = new URL(req.url);
@@ -32,34 +33,48 @@ export default async (req) => {
 };
 
 async function handleConfirm({ id, pending, confirmed }) {
+  // Already confirmed? Idempotent response.
+  const alreadyConfirmed = await confirmed.get(id, { type: "json" });
+  if (alreadyConfirmed) {
+    return page(
+      "Already confirmed",
+      `${alreadyConfirmed.name} (${alreadyConfirmed.vehicle}) on ${alreadyConfirmed.preferred_date} at ${alreadyConfirmed.preferred_time}.`,
+      "info",
+    );
+  }
+
   const booking = await pending.get(id, { type: "json" });
   if (!booking) {
-    // Maybe already confirmed? Look it up.
-    const existingSlot = await findConfirmedById(confirmed, id);
-    if (existingSlot) {
-      return page(
-        "Already confirmed",
-        `${existingSlot.booking.name} (${existingSlot.booking.vehicle}) on ${existingSlot.booking.preferred_date} at ${existingSlot.booking.preferred_time}.`,
-        "info",
-      );
-    }
     return page(
       "Not found",
-      "No pending booking with that id. It may have been cancelled or already confirmed.",
+      "No pending booking with that id. It may have been cancelled, or already confirmed elsewhere.",
       "error",
       404,
     );
   }
 
-  const slotKey = `${booking.preferred_date}${SLOT_DELIM}${booking.preferred_time}`;
-  const conflict = await confirmed.get(slotKey, { type: "json" });
-  if (conflict && conflict.id !== id) {
-    return page(
-      "Slot already taken",
-      `That slot is already confirmed for ${conflict.name} (${conflict.vehicle}). Decline this request and text the customer to reschedule.`,
-      "warn",
-      409,
+  // Overlap check: does this booking's time window collide with any other
+  // confirmed booking on the same date? (Excludes itself.)
+  const window = bookingWindow(booking);
+  if (window && !isFlexibleTime(booking.preferred_time)) {
+    const { blobs } = await confirmed.list();
+    const records = await Promise.all(
+      blobs.map(async (b) => ({ key: b.key, value: await confirmed.get(b.key, { type: "json" }) })),
     );
+    for (const { key, value } of records) {
+      if (!value || key === id) continue;
+      if (value.preferred_date !== booking.preferred_date) continue;
+      const w = bookingWindow(value);
+      if (!w) continue;
+      if (rangesOverlap(window, w)) {
+        return page(
+          "Slot already taken",
+          `That window overlaps with a confirmed booking for ${value.name} (${value.vehicle}) on ${value.preferred_date} at ${value.preferred_time}. Decline this request and text the customer to reschedule.`,
+          "warn",
+          409,
+        );
+      }
+    }
   }
 
   const confirmedBooking = {
@@ -67,20 +82,19 @@ async function handleConfirm({ id, pending, confirmed }) {
     id,
     confirmedAt: new Date().toISOString(),
   };
-  await confirmed.set(slotKey, JSON.stringify(confirmedBooking));
+  await confirmed.set(id, JSON.stringify(confirmedBooking));
   await pending.delete(id);
 
   const cancelHref = actionLink("cancel", id);
   return page(
     "Confirmed ✓",
     bookingSummaryHtml(confirmedBooking) +
-      `<p style="margin:24px 0 0;color:#a1a4ac;font-size:14px;line-height:1.6">Slot is now blocked on the public form. If you need to undo this, <a href="${cancelHref}" style="color:#c9a44c;text-decoration:none">cancel it here</a> — bookmark this page or save this email so you can find the link again.</p>`,
+      `<p style="margin:24px 0 0;color:#a1a4ac;font-size:14px;line-height:1.6">Slot is now blocked on the public form (window: ${formatWindow(window)}). If you need to undo this, <a href="${cancelHref}" style="color:#c9a44c;text-decoration:none">cancel it here</a> — bookmark this page or save this email so you can find the link again.</p>`,
     "success",
   );
 }
 
 async function handleCancel({ id, pending, confirmed }) {
-  // Pending first.
   const pendingBooking = await pending.get(id, { type: "json" });
   if (pendingBooking) {
     await pending.delete(id);
@@ -91,35 +105,35 @@ async function handleCancel({ id, pending, confirmed }) {
     );
   }
 
-  // Otherwise look it up in confirmed.
-  const found = await findConfirmedById(confirmed, id);
-  if (!found) {
+  const confirmedBooking = await confirmed.get(id, { type: "json" });
+  if (!confirmedBooking) {
     return page("Not found", "No booking with that id.", "error", 404);
   }
-  await confirmed.delete(found.slotKey);
+  await confirmed.delete(id);
   return page(
     "Cancelled",
-    `Confirmed booking for ${found.booking.name} cancelled. ${found.booking.preferred_date} at ${found.booking.preferred_time} is open again.`,
+    `Confirmed booking for ${confirmedBooking.name} cancelled. ${confirmedBooking.preferred_date} at ${confirmedBooking.preferred_time} is open again.`,
     "info",
   );
 }
 
-async function findConfirmedById(confirmed, id) {
-  const { blobs } = await confirmed.list();
-  for (const b of blobs) {
-    const booking = await confirmed.get(b.key, { type: "json" });
-    if (booking && booking.id === id) {
-      return { slotKey: b.key, booking };
-    }
-  }
-  return null;
-}
-
 function actionLink(action, id) {
-  // Caller is in Netlify, so process.env.URL is set to the site URL.
   const base = process.env.URL || "";
   const key = encodeURIComponent(process.env.ADMIN_KEY || "");
   return `${base}/.netlify/functions/booking-action?action=${action}&id=${encodeURIComponent(id)}&key=${key}`;
+}
+
+function formatWindow(w) {
+  if (!w) return "flexible";
+  return `${formatMinutes(w.start)} – ${formatMinutes(w.end)}`;
+}
+
+function formatMinutes(m) {
+  const h = Math.floor(m / 60) % 24;
+  const min = m % 60;
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(min).padStart(2, "0")} ${ampm}`;
 }
 
 function bookingSummaryHtml(b) {

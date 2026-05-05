@@ -12,9 +12,14 @@
 //   OWNER_PHONE     — shown in confirmation email (defaults to 380-222-1158)
 
 import { getStore } from "@netlify/blobs";
+import {
+  bookingWindow,
+  durationFor,
+  isFlexibleTime,
+  rangesOverlap,
+} from "./_services.mjs";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
-const SLOT_DELIM = "|";
 
 const REQUIRED_FIELDS = [
   "name",
@@ -67,24 +72,39 @@ export default async (req) => {
   const ownerEmail = process.env.OWNER_EMAIL || "rsabdon@gmail.com";
   const ownerPhone = process.env.OWNER_PHONE || "380-222-1158";
 
-  // Slot conflict check — primary slot only. Backup slots aren't reserved.
-  const slotKey = `${data.preferred_date}${SLOT_DELIM}${data.preferred_time}`;
-  const isFlexible = /^flexible/i.test(String(data.preferred_time));
+  // Slot conflict check — overlap-aware. The new request's window is the
+  // service's expected duration + buffer. Reject if it overlaps any confirmed
+  // booking on the same date. Flexible-time requests skip the check (the
+  // owner will manually fit them in).
   const confirmedStore = getStore("confirmed-bookings");
   const pendingStore = getStore("pending-bookings");
 
-  if (!isFlexible) {
+  const candidateBooking = {
+    preferred_time: data.preferred_time,
+    service: data.service,
+  };
+  const candidateWindow = bookingWindow(candidateBooking);
+
+  if (!isFlexibleTime(data.preferred_time) && candidateWindow) {
     try {
-      const taken = await confirmedStore.get(slotKey, { type: "json" });
-      if (taken) {
-        return json(
-          {
-            ok: false,
-            error:
-              "That slot was just booked by someone else. Please pick another time and re-submit.",
-          },
-          409,
-        );
+      const { blobs } = await confirmedStore.list();
+      const records = await Promise.all(
+        blobs.map((b) => confirmedStore.get(b.key, { type: "json" })),
+      );
+      for (const r of records) {
+        if (!r || r.preferred_date !== data.preferred_date) continue;
+        const w = bookingWindow(r);
+        if (!w) continue;
+        if (rangesOverlap(candidateWindow, w)) {
+          return json(
+            {
+              ok: false,
+              error:
+                "That time overlaps with a booking already on my schedule. Please pick another time and re-submit.",
+            },
+            409,
+          );
+        }
       }
     } catch (err) {
       // Don't fail the booking if Blobs is hiccuping — log and continue.

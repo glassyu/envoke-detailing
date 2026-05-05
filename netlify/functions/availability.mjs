@@ -1,37 +1,53 @@
-// Public endpoint: returns the list of confirmed (taken) slots so the
-// booking form can disable them in the time dropdown.
+// Public endpoint: returns the busy-time windows so the booking form can
+// disable conflicting time options based on the customer's chosen service.
 //
-// Response: { slots: [{ date: "YYYY-MM-DD", time: "10:00 AM" }, ...] }
+// Confirmed bookings are now keyed by their booking id (not date|time) so
+// multiple bookings can exist on the same day without key collisions.
 //
-// Only date + time are exposed — no customer info. Past dates are filtered out.
+// Response:
+// {
+//   busy: [{ date: "YYYY-MM-DD", start: <minutes>, end: <minutes> }],
+//   durations: { "<service>": <minutes>, ... },
+//   bufferMin: 30
+// }
 
 import { getStore } from "@netlify/blobs";
+import {
+  SERVICE_DURATIONS_MIN,
+  BUFFER_MIN,
+  bookingWindow,
+} from "./_services.mjs";
 
 export default async () => {
   const confirmed = getStore("confirmed-bookings");
   const today = new Date().toISOString().split("T")[0];
-  const slots = [];
+  const busy = [];
 
   try {
     const { blobs } = await confirmed.list();
-    for (const blob of blobs) {
-      const idx = blob.key.indexOf("|");
-      if (idx === -1) continue;
-      const date = blob.key.slice(0, idx);
-      const time = blob.key.slice(idx + 1);
-      if (date < today) continue;
-      slots.push({ date, time });
+    const records = await Promise.all(
+      blobs.map((b) => confirmed.get(b.key, { type: "json" })),
+    );
+    for (const r of records) {
+      if (!r || !r.preferred_date) continue;
+      if (r.preferred_date < today) continue;
+      const w = bookingWindow(r);
+      if (!w) continue;
+      busy.push({ date: r.preferred_date, start: w.start, end: w.end });
     }
   } catch (err) {
     console.error("availability list failed:", err);
   }
 
-  return new Response(JSON.stringify({ slots }), {
-    status: 200,
-    headers: {
-      "content-type": "application/json",
-      "cache-control": "no-store",
-      "access-control-allow-origin": "*",
+  return new Response(
+    JSON.stringify({ busy, durations: SERVICE_DURATIONS_MIN, bufferMin: BUFFER_MIN }),
+    {
+      status: 200,
+      headers: {
+        "content-type": "application/json",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+      },
     },
-  });
+  );
 };

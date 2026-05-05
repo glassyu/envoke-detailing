@@ -8,29 +8,51 @@ document.querySelectorAll('input[type="date"]').forEach((el) => {
 });
 
 // ---------- Availability ----------
-// Pull confirmed (taken) slots from the function and disable them in
-// the time dropdowns whenever the matching date is selected.
+// Pull confirmed busy windows from the function. When the user has picked a
+// service + date, gray out time options whose [start, start+duration+buffer]
+// window overlaps with anything already booked. The longest-running services
+// can block several hours, so we can't just blacklist start times.
 
 const dateTimePairs = [
   ["preferred_date", "preferred_time"],
   ["backup_date", "backup_time"],
 ];
 
-let takenSlots = []; // [{date, time}, ...]
+let busyWindows = []; // [{date, start, end}] minutes since midnight
+let serviceDurations = {};
+let bufferMin = 30;
 
 async function loadAvailability() {
   try {
     const res = await fetch("/.netlify/functions/availability", { cache: "no-store" });
     if (!res.ok) return;
     const body = await res.json();
-    if (Array.isArray(body.slots)) {
-      takenSlots = body.slots;
-      dateTimePairs.forEach(([dn, tn]) => refreshTimeOptions(dn, tn));
-    }
+    busyWindows = Array.isArray(body.busy) ? body.busy : [];
+    serviceDurations = body.durations || {};
+    bufferMin = typeof body.bufferMin === "number" ? body.bufferMin : 30;
+    refreshAllTimeOptions();
   } catch (err) {
     // Silent — availability is a UX nicety. Server-side check still enforces.
     console.warn("Could not load availability:", err);
   }
+}
+
+function timeToMinutes(time) {
+  const m = String(time).match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!m) return null;
+  let hours = parseInt(m[1], 10);
+  const mins = parseInt(m[2], 10);
+  const ampm = m[3].toUpperCase();
+  if (ampm === "PM" && hours !== 12) hours += 12;
+  if (ampm === "AM" && hours === 12) hours = 0;
+  return hours * 60 + mins;
+}
+
+function selectedServiceDuration() {
+  const serviceEl = document.querySelector('[name="service"]');
+  if (!serviceEl || !serviceEl.value) return null;
+  const dur = serviceDurations[serviceEl.value];
+  return typeof dur === "number" ? dur : null;
 }
 
 function refreshTimeOptions(dateName, timeName) {
@@ -39,36 +61,48 @@ function refreshTimeOptions(dateName, timeName) {
   if (!dateEl || !timeEl) return;
 
   const date = dateEl.value;
-  const taken = new Set(
-    takenSlots
-      .filter((s) => s.date === date)
-      .map((s) => s.time),
-  );
+  const serviceDur = selectedServiceDuration();
+
+  // Reset all options first.
+  for (const opt of timeEl.options) {
+    opt.disabled = false;
+    if (opt.value) opt.textContent = opt.value;
+  }
+
+  // No date or no service → server enforces on submit, leave it open.
+  if (!date || !serviceDur) return;
+
+  const totalDur = serviceDur + bufferMin;
+  const dayBusy = busyWindows.filter((b) => b.date === date);
+  if (!dayBusy.length) return;
 
   let currentBecameUnavailable = false;
   for (const opt of timeEl.options) {
-    if (!opt.value || /^flexible/i.test(opt.value)) {
-      opt.disabled = false;
-      opt.textContent = opt.value || "Select…";
-      continue;
-    }
-    if (taken.has(opt.value)) {
+    if (!opt.value || /^flexible/i.test(opt.value)) continue;
+    const start = timeToMinutes(opt.value);
+    if (start == null) continue;
+    const end = start + totalDur;
+    const conflict = dayBusy.some((b) => start < b.end && b.start < end);
+    if (conflict) {
       opt.disabled = true;
-      opt.textContent = `${opt.value} — booked`;
+      opt.textContent = `${opt.value} — unavailable`;
       if (opt.selected) currentBecameUnavailable = true;
-    } else {
-      opt.disabled = false;
-      opt.textContent = opt.value;
     }
   }
   if (currentBecameUnavailable) timeEl.value = "";
 }
 
+function refreshAllTimeOptions() {
+  dateTimePairs.forEach(([dn, tn]) => refreshTimeOptions(dn, tn));
+}
+
 dateTimePairs.forEach(([dn, tn]) => {
   const dateEl = document.querySelector(`[name="${dn}"]`);
-  if (!dateEl) return;
-  dateEl.addEventListener("change", () => refreshTimeOptions(dn, tn));
+  if (dateEl) dateEl.addEventListener("change", () => refreshTimeOptions(dn, tn));
 });
+
+const serviceEl = document.querySelector('[name="service"]');
+if (serviceEl) serviceEl.addEventListener("change", refreshAllTimeOptions);
 
 loadAvailability();
 
