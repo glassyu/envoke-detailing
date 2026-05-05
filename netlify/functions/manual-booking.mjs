@@ -29,9 +29,9 @@ export default async (req) => {
     return json({ ok: false, error: "Invalid JSON" }, 400);
   }
 
-  const adminKey = process.env.ADMIN_KEY;
-  if (!adminKey) return json({ ok: false, error: "Server misconfigured" }, 500);
-  if (body.key !== adminKey) return json({ ok: false, error: "Unauthorized" }, 401);
+  const validKeys = [process.env.ADMIN_KEY, process.env.ADMIN_PASSWORD].filter(Boolean);
+  if (!validKeys.length) return json({ ok: false, error: "Server misconfigured" }, 500);
+  if (!validKeys.includes(body.key)) return json({ ok: false, error: "Wrong password." }, 401);
 
   const required = ["date", "time", "service"];
   for (const f of required) {

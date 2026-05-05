@@ -52,10 +52,11 @@ In the Netlify dashboard → Site settings → Environment variables, add:
 | `RESEND_API_KEY` | The key from step 1 |
 | `RESEND_FROM` | `Envoke Detailing <bookings@envokedetailing.com>` (or whatever verified sender you set up) |
 | `ADMIN_KEY` | A random secret. Generate with: `openssl rand -hex 24` |
+| `ADMIN_PASSWORD` | Short password used to log into `/admin.html`. |
 | `OWNER_EMAIL` | `rsabdon@gmail.com` (optional — defaults to this) |
 | `OWNER_PHONE` | `380-222-1158` (optional — defaults to this) |
 
-`ADMIN_KEY` is what authorizes the Confirm/Decline links in your email. Anyone with that key + a booking id can confirm/cancel — keep it secret.
+`ADMIN_KEY` is what authorizes the Confirm/Decline links in your email — keep it long and random since it's exposed in URLs in your inbox. `ADMIN_PASSWORD` is the short password you type to use the admin page; it never appears in any URL. Both authorize the admin endpoints, so either secret works.
 
 Redeploy after adding env vars.
 

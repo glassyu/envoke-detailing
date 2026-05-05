@@ -18,9 +18,9 @@ export default async (req) => {
   const id = url.searchParams.get("id");
   const key = url.searchParams.get("key");
 
-  const adminKey = process.env.ADMIN_KEY;
-  if (!adminKey) return page("Server misconfigured", "Missing ADMIN_KEY env var.", "error");
-  if (key !== adminKey) return page("Unauthorized", "This link is missing or has the wrong key.", "error", 401);
+  const validKeys = [process.env.ADMIN_KEY, process.env.ADMIN_PASSWORD].filter(Boolean);
+  if (!validKeys.length) return page("Server misconfigured", "Missing ADMIN_KEY env var.", "error");
+  if (!validKeys.includes(key)) return page("Unauthorized", "This link is missing or has the wrong key.", "error", 401);
   if (!id) return page("Bad request", "Missing booking id.", "error", 400);
   if (!["confirm", "cancel"].includes(action))
     return page("Bad request", "Unknown action.", "error", 400);

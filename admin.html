@@ -37,8 +37,8 @@
 
     <div class="key-panel">
       <label style="flex:1;display:flex;flex-direction:column;gap:0.3rem">
-        <span style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-mute);font-weight:500">Admin key</span>
-        <input type="password" id="admin-key" autocomplete="current-password" placeholder="Paste ADMIN_KEY value" />
+        <span style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-mute);font-weight:500">Password</span>
+        <input type="password" id="admin-key" autocomplete="current-password" placeholder="Enter password" />
       </label>
       <button type="button" class="btn btn-ghost" id="key-save">Save</button>
       <span class="key-status" id="key-status">not set</span>
@@ -156,7 +156,7 @@
   </main>
 
   <script>
-    const KEY_STORAGE = "envoke_admin_key";
+    const KEY_STORAGE = "envoke_admin_password";
     const keyInput = document.getElementById("admin-key");
     const keySave = document.getElementById("key-save");
     const keyStatus = document.getElementById("key-status");
@@ -196,7 +196,7 @@
       errEl.hidden = true;
       const key = (keyInput.value || sessionStorage.getItem(KEY_STORAGE) || "").trim();
       if (!key) {
-        showError("Enter your admin key first.");
+        showError("Enter your password first.");
         return;
       }
 
