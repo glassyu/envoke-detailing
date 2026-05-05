@@ -86,10 +86,13 @@ async function handleConfirm({ id, pending, confirmed }) {
   await pending.delete(id);
 
   const cancelHref = actionLink("cancel", id);
+  const statusLine = window
+    ? `Slot is now blocked on the public form (window: ${formatWindow(window)}).`
+    : `This is a flexible-time booking — it will <b>not</b> block other times on the form. Text the customer to lock in a real time, then handle conflicts manually.`;
   return page(
     "Confirmed ✓",
     bookingSummaryHtml(confirmedBooking) +
-      `<p style="margin:24px 0 0;color:#a1a4ac;font-size:14px;line-height:1.6">Slot is now blocked on the public form (window: ${formatWindow(window)}). If you need to undo this, <a href="${cancelHref}" style="color:#c9a44c;text-decoration:none">cancel it here</a> — bookmark this page or save this email so you can find the link again.</p>`,
+      `<p style="margin:24px 0 0;color:#a1a4ac;font-size:14px;line-height:1.6">${statusLine} If you need to undo this, <a href="${cancelHref}" style="color:#c9a44c;text-decoration:none">cancel it here</a> — bookmark this page or save this email so you can find the link again.</p>`,
     "success",
   );
 }

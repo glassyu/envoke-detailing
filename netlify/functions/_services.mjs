@@ -49,11 +49,11 @@ export function isFlexibleTime(time) {
 }
 
 // Returns {start, end} minutes-since-midnight for a booking, or null if the
-// booking has no resolvable window. Flexible-time bookings block the whole day.
+// booking has no resolvable window (flexible-time, unparseable, or otherwise
+// not a fixed slot). Callers treat null as "doesn't block anything" — the
+// owner handles those manually over text.
 export function bookingWindow(booking) {
-  if (isFlexibleTime(booking.preferred_time)) {
-    return { start: 0, end: 24 * 60 };
-  }
+  if (isFlexibleTime(booking.preferred_time)) return null;
   const start = timeToMinutes(booking.preferred_time);
   if (start == null) return null;
   const dur = durationFor(booking.service) + BUFFER_MIN;
