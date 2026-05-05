@@ -127,9 +127,8 @@
       </div>
 
       <div class="contact-grid">
-        <form class="request-form" name="detailing-request" method="POST" data-netlify="true" netlify-honeypot="bot-field" action="/?submitted=true">
-          <input type="hidden" name="form-name" value="detailing-request" />
-          <p class="hp"><label>Don't fill this out: <input name="bot-field" /></label></p>
+        <form class="request-form" id="booking-form" method="POST" action="/.netlify/functions/submit-booking">
+          <p class="hp" aria-hidden="true"><label>Don't fill this out: <input name="bot-field" tabindex="-1" autocomplete="off" /></label></p>
 
           <fieldset>
             <legend>Contact</legend>
@@ -263,8 +262,9 @@
             </label>
           </fieldset>
 
-          <button type="submit" class="btn btn-primary btn-lg">Send booking request</button>
-          <p class="form-note">You'll get a text from 380-222-1158 to confirm. No charge until the work is done.</p>
+          <button type="submit" class="btn btn-primary btn-lg" id="booking-submit">Send booking request</button>
+          <p class="form-note">You'll get a confirmation email, then a text from 380-222-1158. No charge until the work is done.</p>
+          <p class="form-error" id="booking-error" hidden></p>
         </form>
 
         <aside class="contact-info">

@@ -364,6 +364,17 @@ p { margin: 0; }
 .request-form textarea { resize: vertical; min-height: 96px; }
 .request-form .btn-lg { align-self: stretch; padding: 1rem 1.5rem; font-size: 1rem; }
 .form-note { color: var(--text-mute); font-size: 0.85rem; text-align: center; }
+.form-error {
+  background: rgba(220, 70, 70, 0.08);
+  border: 1px solid rgba(220, 70, 70, 0.35);
+  color: #f5a5a5;
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem;
+  font-size: 0.9rem;
+  margin: 0;
+  text-align: center;
+}
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .hp { position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden; }
 
 /* Add-on checkboxes */
