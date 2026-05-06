@@ -5,8 +5,5 @@
   "description": "Envoke Detailing — mobile auto detailing site (Central Columbus, OH)",
   "engines": {
     "node": ">=20"
-  },
-  "dependencies": {
-    "@netlify/blobs": "^8.1.0"
   }
 }

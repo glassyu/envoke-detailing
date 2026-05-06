@@ -1,27 +1,14 @@
-// Netlify Function: receives the booking form, checks for slot conflicts,
-// stores a pending booking in Netlify Blobs, and sends two emails via Resend.
+// Netlify Function: receives the booking form, sends two emails via Resend.
+//
+// No conflict checks, no storage, no pending state. Customer sends a request,
+// owner gets notified, customer gets a confirmation. Owner replies/texts to
+// lock in the time. Manual scheduling.
 //
 // Required Netlify env vars:
 //   RESEND_API_KEY  — from resend.com/api-keys
 //   RESEND_FROM     — verified sender, e.g. "Envoke Detailing <bookings@envokedetailing.com>"
-//                      (during testing without a verified domain, set to "onboarding@resend.dev"
-//                       — only delivers to your own verified Resend account email)
-//   ADMIN_KEY       — random secret string. Used to authorize the Confirm/Decline links
-//                      in the owner notification email. Generate with `openssl rand -hex 24`.
 //   OWNER_EMAIL     — where booking notifications go (defaults to rsabdon@gmail.com)
 //   OWNER_PHONE     — shown in confirmation email (defaults to 380-222-1158)
-
-import { getStore } from "@netlify/blobs";
-import {
-  bookingWindow,
-  durationFor,
-  isFlexibleTime,
-  rangesOverlap,
-  timeToMinutes,
-  WORK_START_MIN,
-  WORK_END_MIN,
-  MIN_BOOKING_DATE,
-} from "./_services.mjs";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
@@ -36,6 +23,8 @@ const REQUIRED_FIELDS = [
   "preferred_time",
   "address",
 ];
+
+const MIN_BOOKING_DATE = "2026-05-11";
 
 export default async (req) => {
   if (req.method !== "POST") {
@@ -57,125 +46,27 @@ export default async (req) => {
       return json({ ok: false, error: `Missing required field: ${f}` }, 400);
     }
   }
-
   if (!isEmail(data.email)) {
     return json({ ok: false, error: "Invalid email" }, 400);
   }
-
-  // Date floor: bookings start MIN_BOOKING_DATE.
   if (data.preferred_date < MIN_BOOKING_DATE) {
     return json(
       { ok: false, error: `Bookings start ${MIN_BOOKING_DATE}. Please pick that date or later.` },
       400,
     );
   }
-  if (data.backup_date && data.backup_date < MIN_BOOKING_DATE) {
-    return json(
-      { ok: false, error: `Backup date must be ${MIN_BOOKING_DATE} or later.` },
-      400,
-    );
-  }
-
-  // Work-hours window: start ≥ 9 AM and start + duration ≤ 8 PM. Skip for
-  // flexible-time requests since the customer is leaving timing to Ryan.
-  if (!isFlexibleTime(data.preferred_time)) {
-    const start = timeToMinutes(data.preferred_time);
-    if (start == null) {
-      return json({ ok: false, error: "Invalid preferred time format." }, 400);
-    }
-    const dur = durationFor(data.service);
-    if (start < WORK_START_MIN) {
-      return json({ ok: false, error: "Earliest start time is 9:00 AM." }, 400);
-    }
-    if (start + dur > WORK_END_MIN) {
-      return json(
-        {
-          ok: false,
-          error: `That start time wouldn't finish by 8:00 PM. Pick an earlier time or a shorter service.`,
-        },
-        400,
-      );
-    }
-  }
 
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM;
-  const adminKey = process.env.ADMIN_KEY;
   if (!apiKey || !from) {
     console.error("Missing RESEND_API_KEY or RESEND_FROM");
     return json({ ok: false, error: "Email service not configured" }, 500);
   }
-  if (!adminKey) {
-    console.error("Missing ADMIN_KEY");
-    return json({ ok: false, error: "Booking system not configured" }, 500);
-  }
   const ownerEmail = process.env.OWNER_EMAIL || "rsabdon@gmail.com";
   const ownerPhone = process.env.OWNER_PHONE || "380-222-1158";
 
-  // Slot conflict check — overlap-aware. The new request's window is the
-  // service's expected duration + buffer. Reject if it overlaps any confirmed
-  // booking on the same date. Flexible-time requests skip the check (the
-  // owner will manually fit them in).
-  const confirmedStore = getStore("confirmed-bookings");
-  const pendingStore = getStore("pending-bookings");
-
-  const candidateBooking = {
-    preferred_time: data.preferred_time,
-    service: data.service,
-  };
-  const candidateWindow = bookingWindow(candidateBooking);
-
-  if (!isFlexibleTime(data.preferred_time) && candidateWindow) {
-    let blobs;
-    try {
-      ({ blobs } = await confirmedStore.list());
-    } catch (err) {
-      console.error("Could not list confirmed bookings for conflict check:", err);
-      return json(
-        {
-          ok: false,
-          error:
-            "Couldn't verify availability — please try again, or text 380-222-1158 to book directly.",
-        },
-        503,
-      );
-    }
-    const records = await Promise.all(
-      blobs.map(async (b) => {
-        try {
-          return await confirmedStore.get(b.key, { type: "json" });
-        } catch (err) {
-          console.error("Failed to read confirmed booking", b.key, err);
-          return null;
-        }
-      }),
-    );
-    for (const r of records) {
-      if (!r || r.preferred_date !== data.preferred_date) continue;
-      const w = bookingWindow(r);
-      if (!w) continue;
-      if (rangesOverlap(candidateWindow, w)) {
-        console.log("Conflict on submit:", {
-          candidate: { date: data.preferred_date, ...candidateWindow, service: data.service },
-          existing: { id: r.id, date: r.preferred_date, time: r.preferred_time, service: r.service, ...w },
-        });
-        return json(
-          {
-            ok: false,
-            error:
-              "That time overlaps with a booking already on my schedule. Please pick another time and re-submit.",
-          },
-          409,
-        );
-      }
-    }
-  }
-
   const addons = normalizeAddons(data.addons);
-  const id = generateId();
-  const pendingRecord = {
-    id,
-    requestedAt: new Date().toISOString(),
+  const record = {
     name: String(data.name).trim(),
     email: String(data.email).trim(),
     phone: String(data.phone).trim(),
@@ -192,39 +83,27 @@ export default async (req) => {
     addons,
   };
 
-  try {
-    await pendingStore.set(id, JSON.stringify(pendingRecord));
-  } catch (err) {
-    console.error("Failed to store pending booking:", err);
-    // Still send the email so the request isn't lost — owner can act manually.
-  }
-
-  const siteUrl = process.env.URL || `https://${req.headers.get("host") || ""}`;
-  const confirmUrl = buildActionUrl(siteUrl, "confirm", id, adminKey);
-  const cancelUrl = buildActionUrl(siteUrl, "cancel", id, adminKey);
-
-  const summary = buildSummary(pendingRecord, addons);
-  const firstName = pendingRecord.name.split(/\s+/)[0];
+  const summary = buildSummary(record, addons);
+  const firstName = record.name.split(/\s+/)[0];
 
   const ownerEmailReq = sendEmail(apiKey, {
     from,
     to: ownerEmail,
-    reply_to: pendingRecord.email,
-    subject: `New booking — ${pendingRecord.name} · ${pendingRecord.vehicle}`,
-    text: buildOwnerText(pendingRecord, summary, confirmUrl, cancelUrl),
-    html: buildOwnerHtml(pendingRecord, summary, confirmUrl, cancelUrl),
+    reply_to: record.email,
+    subject: `New booking — ${record.name} · ${record.vehicle}`,
+    text: buildOwnerText(record, summary),
+    html: buildOwnerHtml(record, summary),
   });
 
   const customerEmailReq = sendEmail(apiKey, {
     from,
-    to: pendingRecord.email,
+    to: record.email,
     reply_to: ownerEmail,
     subject: "We got your request — Envoke Detailing",
-    text: buildCustomerText(firstName, pendingRecord, summary, ownerPhone, ownerEmail),
-    html: buildCustomerHtml(firstName, pendingRecord, summary, ownerPhone, ownerEmail),
+    text: buildCustomerText(firstName, record, summary, ownerPhone, ownerEmail),
+    html: buildCustomerHtml(firstName, record, summary, ownerPhone, ownerEmail),
   });
 
-  // Owner email is critical; customer email is nice-to-have.
   const [ownerResult, customerResult] = await Promise.allSettled([
     ownerEmailReq,
     customerEmailReq,
@@ -239,26 +118,10 @@ export default async (req) => {
   }
   if (customerResult.status === "rejected") {
     console.warn("Customer confirmation email failed:", customerResult.reason);
-    // Still return success — owner got it.
   }
 
   return json({ ok: true });
 };
-
-function generateId() {
-  // 16-byte random id, hex-encoded.
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-function buildActionUrl(siteUrl, action, id, key) {
-  const u = new URL(`${siteUrl.replace(/\/$/, "")}/.netlify/functions/booking-action`);
-  u.searchParams.set("action", action);
-  u.searchParams.set("id", id);
-  u.searchParams.set("key", key);
-  return u.toString();
-}
 
 // ---------- helpers ----------
 
@@ -324,7 +187,7 @@ function summaryToHtml(summary) {
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;margin:8px 0">${rows}</table>`;
 }
 
-function buildOwnerText(d, summary, confirmUrl, cancelUrl) {
+function buildOwnerText(d, summary) {
   return `New booking request from ${d.name}
 
 Contact:
@@ -333,29 +196,10 @@ Contact:
 
 ${summaryToText(summary)}
 
-Confirm this booking (blocks the slot on the public form):
-${confirmUrl}
-
-Decline (does nothing to availability):
-${cancelUrl}
-
-Reply directly to this email to respond to ${d.name}.`;
+Reply directly to this email to respond to ${d.name}, or text them at ${d.phone}.`;
 }
 
-function buildOwnerHtml(d, summary, confirmUrl, cancelUrl) {
-  const actions = `
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 8px;border-collapse:collapse">
-      <tr>
-        <td style="padding:0 8px 0 0">
-          <a href="${escapeAttr(confirmUrl)}" style="display:inline-block;background:#c9a44c;color:#1a1408;text-decoration:none;font-weight:600;font-size:14px;padding:12px 22px;border-radius:999px;letter-spacing:-0.005em">Confirm booking</a>
-        </td>
-        <td style="padding:0">
-          <a href="${escapeAttr(cancelUrl)}" style="display:inline-block;background:transparent;color:#f3f3f4;text-decoration:none;font-weight:500;font-size:14px;padding:11px 21px;border:1px solid #2c313b;border-radius:999px;letter-spacing:-0.005em">Decline</a>
-        </td>
-      </tr>
-    </table>
-    <p style="margin:8px 0 0;color:#6b6e76;font-size:12px;line-height:1.5">Confirming blocks this date+time on the public form so no one else can request it.</p>
-  `;
+function buildOwnerHtml(d, summary) {
   return wrapHtml(
     `<p style="margin:0 0 8px;color:#c9a44c;font-size:11px;text-transform:uppercase;letter-spacing:0.18em;font-weight:500">New booking</p>
      <h1 style="margin:0 0 18px;color:#f3f3f4;font-size:24px;font-weight:600;letter-spacing:-0.02em;line-height:1.2">${escapeHtml(d.name)} — ${escapeHtml(d.vehicle)}</h1>
@@ -365,19 +209,8 @@ function buildOwnerHtml(d, summary, confirmUrl, cancelUrl) {
        <a href="tel:${escapeHtml(d.phone)}" style="color:#c9a44c;text-decoration:none">${escapeHtml(d.phone)}</a>
      </p>
      ${summaryToHtml(summary)}
-     ${actions}
      <p style="margin:24px 0 0;color:#6b6e76;font-size:13px;line-height:1.5">Reply directly to this email to talk to ${escapeHtml(d.name)}, or text them at ${escapeHtml(d.phone)}.</p>`,
   );
-}
-
-function escapeAttr(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
-  })[c]);
 }
 
 function buildCustomerText(firstName, d, summary, ownerPhone, ownerEmail) {
