@@ -131,6 +131,15 @@ async function handleCancel({ id, pending, confirmed }) {
   );
 }
 
+async function findConfirmedById(confirmed, id) {
+  const { blobs } = await confirmed.list();
+  for (const b of blobs) {
+    const value = await confirmed.get(b.key, { type: "json" });
+    if (value && value.id === id) return { slotKey: b.key, booking: value };
+  }
+  return null;
+}
+
 function actionLink(action, id) {
   const base = process.env.URL || "";
   const key = encodeURIComponent(process.env.ADMIN_KEY || "");
