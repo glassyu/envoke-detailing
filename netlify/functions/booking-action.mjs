@@ -108,11 +108,22 @@ async function handleCancel({ id, pending, confirmed }) {
     );
   }
 
-  const confirmedBooking = await confirmed.get(id, { type: "json" });
+  // Direct lookup first. Falls back to iterating + matching by record.id so
+  // we can still cancel legacy bookings stored under their old `date|time`
+  // key (pre-id-key schema).
+  let confirmedKey = id;
+  let confirmedBooking = await confirmed.get(id, { type: "json" });
+  if (!confirmedBooking) {
+    const found = await findConfirmedById(confirmed, id);
+    if (found) {
+      confirmedKey = found.slotKey;
+      confirmedBooking = found.booking;
+    }
+  }
   if (!confirmedBooking) {
     return page("Not found", "No booking with that id.", "error", 404);
   }
-  await confirmed.delete(id);
+  await confirmed.delete(confirmedKey);
   return page(
     "Cancelled",
     `Confirmed booking for ${confirmedBooking.name} cancelled. ${confirmedBooking.preferred_date} at ${confirmedBooking.preferred_time} is open again.`,
